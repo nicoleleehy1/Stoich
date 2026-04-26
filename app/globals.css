@@ -1,21 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --background: #FAF7F2;
+  --background: #FAF6EC;
   --foreground: #1A1A1A;
-  --accent: #CFFF00;
+  --accent: #A8483B;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-lora), ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-vt323), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+.paper-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    rgba(168, 72, 59, 0.06) 31px,
+    rgba(168, 72, 59, 0.06) 32px
+  );
+}
+
+.paper-grain {
+  background-image:
+    radial-gradient(rgba(26, 26, 26, 0.05) 1px, transparent 1px),
+    radial-gradient(rgba(26, 26, 26, 0.04) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 1px 2px;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
 }

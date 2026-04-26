@@ -57,6 +57,8 @@ export const HIGHLIGHT_BG: Record<HighlightColor, string> = {
 const COLOR_ORDER: HighlightColor[] = ["yellow", "green", "blue", "pink"];
 
 const SERIF = { fontFamily: "var(--font-serif)" };
+const SANS = { fontFamily: "var(--font-sans)" };
+const MONO = { fontFamily: "var(--font-mono)" };
 
 const EXAMPLE_TEXT =
   "We synthesized aspirin (acetylsalicylic acid) by reacting salicylic acid with acetic anhydride in the presence of a sulfuric acid catalyst. The product was purified by recrystallization from ethanol, yielding white crystalline needles characteristic of pure acetylsalicylic acid.";
@@ -207,17 +209,27 @@ export default function InputPane(props: {
   return (
     <div className="flex h-full overflow-hidden">
       {sidebarOpen && (
-        <aside className="flex w-[240px] shrink-0 flex-col border-r border-stone-200 bg-white/40">
-          <div className="border-b border-stone-200 p-3">
-            <h2 className="text-base tracking-tight" style={SERIF}>
+        <aside className="flex w-[240px] shrink-0 flex-col border-r border-[#1A1A1A]/25 bg-[#FAF6EC]/60">
+          <div className="border-b border-[#1A1A1A]/25 p-3">
+            <h2
+              className="flex items-baseline gap-2 text-[15px] tracking-tight"
+              style={SERIF}
+            >
+              <span
+                className="text-[10px] uppercase tracking-[0.32em] text-[#A8483B]"
+                style={SANS}
+              >
+                ¶
+              </span>
               History
             </h2>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
-              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
+              placeholder="search..."
+              className="mt-2 w-full border border-[#1A1A1A]/30 bg-[#FAF6EC] px-3 py-1.5 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
+              style={SANS}
             />
           </div>
           <div className="flex-1 overflow-y-auto p-2">
@@ -235,8 +247,11 @@ export default function InputPane(props: {
               />
             )}
           </div>
-          <div className="border-t border-stone-200 p-2 text-[9px] text-[#1A1A1A]/40">
-            MongoDB Atlas Vector Search
+          <div
+            className="border-t border-[#1A1A1A]/25 p-2 text-[10px] tracking-[0.18em] uppercase text-[#1A1A1A]/40"
+            style={SANS}
+          >
+            mongodb atlas vector search
           </div>
         </aside>
       )}
@@ -246,18 +261,40 @@ export default function InputPane(props: {
           <button
             type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-full border border-[#1A1A1A]/20 bg-white px-3 py-1.5 text-xs text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A]/5"
+            className="lab-pill"
+            style={SANS}
           >
-            📚 History
+            history
           </button>
+          {pdfInfo && (
+            <span
+              className="text-[10px] tracking-[0.18em] uppercase text-[#1A1A1A]/50"
+              style={SANS}
+            >
+              pdf loaded
+            </span>
+          )}
         </div>
 
-        <header className="mb-4">
-          <h1 className="text-4xl tracking-tight" style={SERIF}>
-            Stoich
+        <header className="mb-5">
+          <p
+            className="text-[10px] tracking-[0.32em] uppercase text-[#A8483B]"
+            style={SANS}
+          >
+            § 01 — Source
+          </p>
+          <h1
+            className="mt-1 text-3xl tracking-tight"
+            style={SERIF}
+          >
+            Paste, drop, or highlight
+            <span className="text-[#A8483B]">.</span>
           </h1>
-          <p className="mt-1 text-sm text-[#1A1A1A]/60">
-            Paste a chemistry paragraph. See the molecules and the reaction.
+          <p
+            className="mt-1 text-sm text-[#2a2620]"
+            style={SANS}
+          >
+            a paragraph from a chemistry paper, a textbook, a wikipedia article — anything with molecules in it.
           </p>
         </header>
 
@@ -276,15 +313,16 @@ export default function InputPane(props: {
             if (file) onFile(file);
           }}
           className={
-            "mb-3 cursor-pointer rounded-lg border-2 border-dashed p-4 text-center text-sm transition-colors " +
+            "mb-3 cursor-pointer border border-dashed p-4 text-center text-sm transition-colors " +
             (pdfLoading
-              ? "cursor-wait border-stone-300 bg-white text-[#1A1A1A]/50"
+              ? "cursor-wait border-[#1A1A1A]/30 bg-[#FAF6EC] text-[#1A1A1A]/50"
               : dragOver
-                ? "border-[#CFFF00] bg-[#CFFF00]/10 text-[#1A1A1A]"
-                : "border-stone-300 bg-white text-[#1A1A1A]/70 hover:bg-stone-50")
+                ? "border-[#A8483B] bg-[#A8483B]/8 text-[#1A1A1A]"
+                : "border-[#1A1A1A]/30 bg-[#FAF6EC] text-[#2a2620] hover:bg-[#1A1A1A]/[0.03]")
           }
+          style={SANS}
         >
-          {pdfLoading ? "Reading PDF..." : "Drop a PDF here or click to upload"}
+          {pdfLoading ? "reading pdf..." : "drop a pdf here or click to upload"}
           <input
             ref={fileInputRef}
             type="file"
@@ -298,12 +336,19 @@ export default function InputPane(props: {
           />
         </div>
 
-        {pdfError && <p className="mb-2 text-xs text-red-600">{pdfError}</p>}
+        {pdfError && (
+          <p className="mb-2 text-xs text-[#A8483B]" style={SANS}>
+            {pdfError}
+          </p>
+        )}
 
         {pdfInfo && (
-          <div className="mb-3 flex items-center gap-2 text-xs text-[#1A1A1A]/60">
+          <div
+            className="mb-3 flex items-center gap-2 text-xs text-[#1A1A1A]/60"
+            style={SANS}
+          >
             <span className="truncate">
-              Loaded:{" "}
+              loaded:{" "}
               <span className="font-medium text-[#1A1A1A]/80">
                 {pdfInfo.name}
               </span>{" "}
@@ -313,7 +358,7 @@ export default function InputPane(props: {
             <button
               type="button"
               onClick={onClear}
-              className="shrink-0 rounded-full border border-[#1A1A1A]/15 bg-white px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
+              className="shrink-0 border border-[#1A1A1A]/30 bg-[#FAF6EC] px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
               title="Clear"
             >
               ✕
@@ -322,8 +367,11 @@ export default function InputPane(props: {
         )}
 
         {pdfInfo?.truncated && (
-          <p className="mb-2 text-xs italic text-[#1A1A1A]/60">
-            PDF was longer than 50k chars, showing first portion. Highlight a
+          <p
+            className="mb-2 text-xs italic text-[#1A1A1A]/60"
+            style={SANS}
+          >
+            pdf was longer than 50k chars, showing first portion. highlight a
             section to extract.
           </p>
         )}
@@ -344,17 +392,17 @@ export default function InputPane(props: {
           onSaveNote={saveNote}
         />
 
-        <div className="mt-3 flex items-center gap-2 text-xs">
+        <div className="mt-3 flex items-center gap-2 text-xs" style={SANS}>
           {hasSelection ? (
             <>
-              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#CFFF00]" />
+              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#A8483B]" />
               <span className="truncate italic text-[#1A1A1A]/70">
-                Extracting selection: {selectedText.slice(0, 80)}
+                extracting selection: {selectedText.slice(0, 80)}
                 {selectedText.length > 80 ? "..." : ""}
               </span>
             </>
           ) : (
-            <span className="text-[#1A1A1A]/50">Extracting full paragraph</span>
+            <span className="text-[#1A1A1A]/50">extracting full paragraph</span>
           )}
         </div>
 
@@ -362,33 +410,39 @@ export default function InputPane(props: {
           <button
             type="button"
             onClick={() => setText(EXAMPLE_TEXT)}
-            className="rounded-full border border-[#1A1A1A]/20 bg-white px-4 py-2 text-sm text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A]/5"
+            className="lab-pill"
+            style={SANS}
           >
-            Try an example
+            try an example
           </button>
           <button
             type="button"
             onClick={() => setText(MULTISTEP_EXAMPLE_TEXT)}
-            className="rounded-full border border-[#1A1A1A]/20 bg-white px-4 py-2 text-sm text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A]/5"
+            className="lab-pill"
+            style={SANS}
           >
-            Try multi-step example
+            try multi-step example
           </button>
           <button
             type="button"
             onClick={onSubmit}
             disabled={loading || !canSubmit}
-            className="rounded-full bg-[#CFFF00] px-6 py-3 text-base font-medium text-[#1A1A1A] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="extract-btn"
+            style={SANS}
           >
             {loading
-              ? "Reading paragraph..."
+              ? "reading paragraph..."
               : hasSelection
-                ? "Extract selection"
-                : "Extract molecules"}
+                ? "extract selection →"
+                : "extract molecules →"}
           </button>
         </div>
 
         {errored && (
-          <p className="mt-3 text-sm text-[#1A1A1A]/70">
+          <p
+            className="mt-3 text-sm text-[#A8483B]"
+            style={SANS}
+          >
             extraction failed, try again
           </p>
         )}
@@ -402,9 +456,41 @@ export default function InputPane(props: {
           onDelete={onDeleteHighlight}
         />
       </div>
+
+      <style>{paneStyles}</style>
     </div>
   );
 }
+
+const paneStyles = `
+  .lab-pill {
+    border: 1px solid #1A1A1A;
+    background: #FAF6EC;
+    color: #1A1A1A;
+    padding: 8px 16px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition: background-color .2s, color .2s;
+  }
+  .lab-pill:hover {
+    background: #1A1A1A;
+    color: #FAF6EC;
+  }
+  .extract-btn {
+    border: 1px solid #1A1A1A;
+    background: #1A1A1A;
+    color: #FAF6EC;
+    padding: 11px 22px;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition: background-color .2s, color .2s, opacity .2s;
+  }
+  .extract-btn:hover { background: #FAF6EC; color: #1A1A1A; }
+  .extract-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .extract-btn:disabled:hover { background: #1A1A1A; color: #FAF6EC; }
+`;
 
 function HighlightedTextarea({
   text,
@@ -447,12 +533,12 @@ function HighlightedTextarea({
 
   return (
     <div className="relative w-full flex-1">
-      <div className="relative h-full min-h-[200px] w-full overflow-hidden rounded-2xl border border-stone-200 bg-white focus-within:border-[#1A1A1A]/40">
+      <div className="relative h-full min-h-[200px] w-full overflow-hidden border border-[#1A1A1A]/30 bg-[#FDFBF5] focus-within:border-[#1A1A1A]">
         <div
           data-mirror
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-5 text-base leading-relaxed"
-          style={{ color: "transparent" }}
+          style={{ color: "transparent", ...SANS }}
         >
           {renderSegments(text, highlights)}
         </div>
@@ -467,13 +553,14 @@ function HighlightedTextarea({
           onKeyUp={readSelectionFromTextarea}
           onMouseUp={readSelectionFromTextarea}
           onScroll={handleScroll}
-          placeholder="Paste a paragraph from a chemistry paper, an organic chem textbook, a Wikipedia article on a drug..."
-          className="absolute inset-0 h-full w-full resize-none bg-transparent p-5 text-base leading-relaxed text-[#1A1A1A] caret-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:outline-none"
+          placeholder="paste a paragraph from a chemistry paper, an organic chem textbook, a wikipedia article on a drug..."
+          className="absolute inset-0 h-full w-full resize-none bg-transparent p-5 text-base leading-relaxed text-[#1A1A1A] caret-[#A8483B] placeholder:text-[#1A1A1A]/40 focus:outline-none"
+          style={SANS}
         />
 
         {hasSelection && !notePopoverOpen && (
           <div
-            className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full border border-stone-200 bg-white p-1 shadow-md"
+            className="absolute right-3 top-3 z-10 flex items-center gap-1 border border-[#1A1A1A]/30 bg-[#FAF6EC] p-1 shadow-md"
             onMouseDown={(e) => e.preventDefault()}
           >
             {COLOR_ORDER.map((c) => (
@@ -496,31 +583,39 @@ function HighlightedTextarea({
                 e.preventDefault();
                 onOpenNote();
               }}
-              className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-xs text-[#1A1A1A]/80 hover:bg-stone-50"
+              className="border border-[#1A1A1A]/30 bg-[#FAF6EC] px-2 py-0.5 text-xs text-[#1A1A1A]/80 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
               title="Add note"
+              style={SANS}
             >
-              💬 Note
+              + note
             </button>
           </div>
         )}
 
         {notePopoverOpen && (
           <div
-            className="absolute right-3 top-3 z-10 w-72 rounded-xl border border-stone-200 bg-white p-3 shadow-lg"
+            className="absolute right-3 top-3 z-10 w-72 border border-[#1A1A1A]/30 bg-[#FAF6EC] p-3 shadow-lg"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <p className="mb-1 text-[10px] uppercase tracking-wider text-[#1A1A1A]/50">
-              Note
+            <p
+              className="mb-1 text-[10px] uppercase tracking-[0.18em] text-[#A8483B]"
+              style={SANS}
+            >
+              note
             </p>
             <textarea
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
-              placeholder="What's interesting about this?"
+              placeholder="what's interesting about this?"
               autoFocus
-              className="h-20 w-full resize-none rounded-md border border-stone-200 bg-white p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
+              className="h-20 w-full resize-none border border-[#1A1A1A]/30 bg-[#FDFBF5] p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
+              style={SANS}
             />
-            <p className="mt-2 mb-1 text-[10px] uppercase tracking-wider text-[#1A1A1A]/50">
-              Color
+            <p
+              className="mb-1 mt-2 text-[10px] uppercase tracking-[0.18em] text-[#A8483B]"
+              style={SANS}
+            >
+              color
             </p>
             <div className="flex items-center gap-1">
               {COLOR_ORDER.map((c) => (
@@ -537,9 +632,10 @@ function HighlightedTextarea({
               <button
                 type="button"
                 onClick={onCloseNote}
-                className="ml-auto rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-stone-50"
+                className="ml-auto border border-[#1A1A1A]/30 bg-[#FAF6EC] px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+                style={SANS}
               >
-                Cancel
+                cancel
               </button>
             </div>
           </div>
@@ -632,14 +728,15 @@ function HighlightsSection({
 }) {
   if (highlights.length === 0) return null;
   return (
-    <div className="mt-5 border-t border-stone-200 pt-3">
+    <div className="mt-5 border-t border-[#1A1A1A]/25 pt-3">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between text-xs text-[#1A1A1A]/70 hover:text-[#1A1A1A]"
+        className="flex w-full items-center justify-between text-xs text-[#1A1A1A]/70 hover:text-[#A8483B]"
+        style={SANS}
       >
         <span>
-          📝 {highlights.length}{" "}
+          <span className="text-[#A8483B]">¶</span> {highlights.length}{" "}
           {highlights.length === 1 ? "highlight" : "highlights"}
         </span>
         <span className="text-[10px]">{expanded ? "▼" : "▶"}</span>
@@ -695,7 +792,7 @@ function HighlightItem({
       : highlight.text;
 
   return (
-    <li className="group relative rounded-lg border border-stone-200 bg-white p-2.5">
+    <li className="group relative border border-[#1A1A1A]/20 bg-[#FDFBF5] p-2.5">
       <div className="flex items-start gap-2">
         <span
           className="mt-1 inline-block h-3 w-3 shrink-0 rounded-full border border-black/10"
@@ -707,6 +804,7 @@ function HighlightItem({
             type="button"
             onClick={() => onFocus(highlight)}
             className="block w-full text-left text-xs text-[#1A1A1A] hover:underline"
+            style={SANS}
           >
             <span
               className="rounded-sm px-0.5"
@@ -722,24 +820,27 @@ function HighlightItem({
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Add a note..."
+                placeholder="add a note..."
                 autoFocus
-                className="h-16 w-full resize-none rounded-md border border-stone-200 bg-white p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
+                className="h-16 w-full resize-none border border-[#1A1A1A]/30 bg-[#FAF6EC] p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
+                style={SANS}
               />
               <div className="mt-1 flex gap-1">
                 <button
                   type="button"
                   onClick={save}
-                  className="rounded-full bg-[#CFFF00] px-2 py-0.5 text-[10px] font-medium text-[#1A1A1A]"
+                  className="border border-[#1A1A1A] bg-[#1A1A1A] px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#FAF6EC] hover:bg-[#FAF6EC] hover:text-[#1A1A1A]"
+                  style={SANS}
                 >
-                  Save
+                  save
                 </button>
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="rounded-full border border-stone-200 px-2 py-0.5 text-[10px] text-[#1A1A1A]/70"
+                  className="border border-[#1A1A1A]/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+                  style={SANS}
                 >
-                  Cancel
+                  cancel
                 </button>
               </div>
             </div>
@@ -750,7 +851,8 @@ function HighlightItem({
                 setDraft(highlight.note ?? "");
                 setEditing(true);
               }}
-              className="mt-1 block w-full text-left text-[11px] italic text-[#1A1A1A]/60 hover:text-[#1A1A1A]/80"
+              className="mt-1 block w-full text-left text-[11px] italic text-[#1A1A1A]/60 hover:text-[#A8483B]"
+              style={SANS}
             >
               {highlight.note ? highlight.note : "+ add note"}
             </button>
@@ -763,7 +865,7 @@ function HighlightItem({
           title="Delete"
           aria-label="Delete highlight"
         >
-          <span className="text-xs text-[#1A1A1A]/50 hover:text-red-600">
+          <span className="text-xs text-[#1A1A1A]/50 hover:text-[#A8483B]">
             ✕
           </span>
         </button>
@@ -782,12 +884,16 @@ function HistoryList({
   onPick: (id: string) => void;
 }) {
   if (error) {
-    return <p className="text-xs text-[#1A1A1A]/50">history unavailable</p>;
+    return (
+      <p className="text-xs text-[#1A1A1A]/50" style={SANS}>
+        history unavailable
+      </p>
+    );
   }
   if (items.length === 0) {
     return (
-      <p className="text-xs text-[#1A1A1A]/50">
-        Extractions you run will appear here.
+      <p className="text-xs text-[#1A1A1A]/50" style={SANS}>
+        extractions you run will appear here.
       </p>
     );
   }
@@ -798,15 +904,24 @@ function HistoryList({
           <button
             type="button"
             onClick={() => onPick(it.id)}
-            className="w-full rounded-lg border border-stone-200 bg-white p-2 text-left transition-colors hover:bg-stone-50"
+            className="w-full border border-[#1A1A1A]/20 bg-[#FDFBF5] p-2 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
           >
-            <p className="truncate text-xs font-bold text-[#1A1A1A]">
+            <p
+              className="truncate text-xs font-bold text-[#1A1A1A]"
+              style={SANS}
+            >
               {it.primary_product_name}
             </p>
-            <p className="mt-1 line-clamp-2 text-[10px] text-[#1A1A1A]/60">
+            <p
+              className="mt-1 line-clamp-2 text-[10px] text-[#1A1A1A]/60"
+              style={SANS}
+            >
               {it.source_text_preview}
             </p>
-            <p className="mt-1 text-[9px] text-[#1A1A1A]/40">
+            <p
+              className="mt-1 text-[10px] tracking-[0.1em] text-[#1A1A1A]/40"
+              style={MONO}
+            >
               {timeAgo(it.created_at)} · {it.compound_count}{" "}
               {it.compound_count === 1 ? "compound" : "compounds"}
             </p>
@@ -827,10 +942,18 @@ function SearchList({
   onPick: (id: string) => void;
 }) {
   if (loading) {
-    return <p className="text-xs text-[#1A1A1A]/50">Searching...</p>;
+    return (
+      <p className="text-xs text-[#1A1A1A]/50" style={SANS}>
+        searching...
+      </p>
+    );
   }
   if (results.length === 0) {
-    return <p className="text-xs text-[#1A1A1A]/50">No matches.</p>;
+    return (
+      <p className="text-xs text-[#1A1A1A]/50" style={SANS}>
+        no matches.
+      </p>
+    );
   }
   return (
     <ul className="flex flex-col gap-2">
@@ -839,20 +962,32 @@ function SearchList({
           <button
             type="button"
             onClick={() => onPick(r.extraction_id)}
-            className="w-full rounded-lg border border-stone-200 bg-white p-2 text-left transition-colors hover:bg-stone-50"
+            className="w-full border border-[#1A1A1A]/20 bg-[#FDFBF5] p-2 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-xs font-bold text-[#1A1A1A]">
+              <p
+                className="truncate text-xs font-bold text-[#1A1A1A]"
+                style={SANS}
+              >
                 {r.compound_name}
               </p>
-              <span className="shrink-0 rounded-full bg-[#CFFF00]/40 px-1.5 py-0.5 font-mono text-[9px] text-[#1A1A1A]/70">
+              <span
+                className="shrink-0 border border-[#A8483B]/40 bg-[#A8483B]/10 px-1.5 py-0.5 text-[9px] text-[#A8483B]"
+                style={MONO}
+              >
                 {r.score.toFixed(3)}
               </span>
             </div>
-            <p className="mt-1 line-clamp-2 text-[10px] italic text-[#1A1A1A]/70">
+            <p
+              className="mt-1 line-clamp-2 text-[10px] italic text-[#1A1A1A]/70"
+              style={SANS}
+            >
               {r.one_line}
             </p>
-            <p className="mt-1 line-clamp-1 text-[9px] text-[#1A1A1A]/50">
+            <p
+              className="mt-1 line-clamp-1 text-[10px] text-[#1A1A1A]/50"
+              style={SANS}
+            >
               {r.source_text_preview}
             </p>
           </button>

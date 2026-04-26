@@ -28,6 +28,8 @@ export type Step = {
 };
 
 const SERIF = { fontFamily: "var(--font-serif)" };
+const SANS = { fontFamily: "var(--font-sans)" };
+const MONO = { fontFamily: "var(--font-mono)" };
 const NARROW_PX = 300;
 
 export default function ReactionPane(props: {
@@ -72,59 +74,70 @@ export default function ReactionPane(props: {
   const showAnyReaction = reactionSteps.length > 0;
 
   return (
-    <div ref={containerRef} className="flex h-full flex-col p-4">
-      <header className="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-2">
+    <div ref={containerRef} className="flex h-full flex-col p-5">
+      <header className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-xl tracking-tight" style={SERIF}>
-            The Reaction
-          </h2>
-          <p className="text-xs text-[#1A1A1A]/60">
+          <p
+            className="text-[10px] tracking-[0.32em] uppercase text-[#A8483B]"
+            style={SANS}
+          >
+            § 02 — Reaction
+          </p>
+          <h2 className="mt-1 text-xl tracking-tight" style={SERIF}>
             {isMultiStep
-              ? `${reactionSteps.length} steps · as Gemma understood it`
-              : "as Gemma understood it"}
+              ? `${reactionSteps.length} steps, recovered`
+              : "recovered from text"}
+            <span className="text-[#A8483B]">.</span>
+          </h2>
+          <p className="mt-0.5 text-xs text-[#1A1A1A]/60" style={SANS}>
+            as Gemma understood it
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-full border border-[#1A1A1A]/20 bg-white text-xs">
+          <div
+            className="inline-flex overflow-hidden border border-[#1A1A1A] bg-[#FAF6EC] text-[10px] uppercase tracking-[0.18em]"
+            style={SANS}
+          >
             <button
               type="button"
               onClick={() => setViewMode("equation")}
               className={
-                "px-2.5 py-1 transition-colors " +
+                "px-3 py-1.5 transition-colors " +
                 (viewMode === "equation"
-                  ? "bg-[#1A1A1A] text-white"
+                  ? "bg-[#1A1A1A] text-[#FAF6EC]"
                   : "text-[#1A1A1A] hover:bg-[#1A1A1A]/5")
               }
             >
-              Equation
+              equation
             </button>
             <button
               type="button"
               onClick={() => setViewMode("graph")}
               className={
-                "px-2.5 py-1 transition-colors " +
+                "border-l border-[#1A1A1A] px-3 py-1.5 transition-colors " +
                 (viewMode === "graph"
-                  ? "bg-[#1A1A1A] text-white"
+                  ? "bg-[#1A1A1A] text-[#FAF6EC]"
                   : "text-[#1A1A1A] hover:bg-[#1A1A1A]/5")
               }
             >
-              Graph
+              graph
             </button>
           </div>
           <button
             type="button"
             onClick={onNarrate}
             disabled={narrateLoading || compoundsCount === 0}
-            className="rounded-full border border-[#1A1A1A]/20 bg-white px-2.5 py-1 text-xs text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A]/5 disabled:cursor-not-allowed disabled:opacity-50"
+            className="border border-[#1A1A1A] bg-[#FAF6EC] px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF6EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#FAF6EC] disabled:hover:text-[#1A1A1A]"
             aria-label="Narrate the reaction"
+            style={SANS}
           >
             {narrateLoading ? (
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#1A1A1A]/20 border-t-[#1A1A1A]/70" />
-                Generating...
+                generating...
               </span>
             ) : (
-              "🔊 Narrate"
+              "narrate"
             )}
           </button>
         </div>
@@ -143,16 +156,25 @@ export default function ReactionPane(props: {
         }
       >
         {loading ? (
-          <p className="m-auto text-sm text-[#1A1A1A]/50">
-            Reading paragraph...
+          <p
+            className="m-auto text-sm italic text-[#1A1A1A]/50"
+            style={SANS}
+          >
+            reading paragraph...
           </p>
         ) : !hasRun ? (
-          <p className="m-auto text-sm text-[#1A1A1A]/50">
-            Extract a paragraph to see the reaction
+          <p
+            className="m-auto text-sm italic text-[#1A1A1A]/50"
+            style={SANS}
+          >
+            extract a paragraph to see the reaction
           </p>
         ) : !showAnyReaction ? (
-          <p className="m-auto text-sm text-[#1A1A1A]/50">
-            No clear reaction detected
+          <p
+            className="m-auto text-sm italic text-[#1A1A1A]/50"
+            style={SANS}
+          >
+            no clear reaction detected
           </p>
         ) : viewMode === "graph" ? (
           <ReactionGraph
@@ -163,12 +185,17 @@ export default function ReactionPane(props: {
           <div className="flex flex-col">
             {reactionSteps.map((step, i) => (
               <div key={step.step_number}>
-                {i > 0 && <div className="my-2 border-t border-stone-200" />}
+                {i > 0 && <div className="my-3 border-t border-[#1A1A1A]/20" />}
                 <p
-                  className="mb-2 text-sm italic text-[#1A1A1A]/60"
+                  className="mb-2 flex items-baseline gap-2 text-sm italic text-[#1A1A1A]/70"
                   style={SERIF}
                 >
-                  Step {step.step_number}
+                  <span
+                    className="text-[10px] not-italic tracking-[0.32em] uppercase text-[#A8483B]"
+                    style={SANS}
+                  >
+                    step {step.step_number}
+                  </span>
                 </p>
                 <StepEquation
                   step={step}
@@ -176,7 +203,10 @@ export default function ReactionPane(props: {
                   onPickCompound={onPickCompound}
                 />
                 {step.description && (
-                  <p className="mt-2 text-xs text-[#1A1A1A]/60">
+                  <p
+                    className="mt-2 text-xs italic text-[#1A1A1A]/60"
+                    style={SANS}
+                  >
                     {step.description}
                   </p>
                 )}
@@ -244,8 +274,11 @@ function StepEquation({
         vertical={vertical}
       />
       {step.conditions.yield && (
-        <span className="rounded-full bg-[#1A1A1A]/10 px-2.5 py-1 font-mono text-[10px] text-[#1A1A1A]/70">
-          yield: {step.conditions.yield}
+        <span
+          className="border border-[#A8483B]/40 bg-[#A8483B]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#A8483B]"
+          style={SANS}
+        >
+          yield · {step.conditions.yield}
         </span>
       )}
       {products.map((c, i) => (
@@ -288,15 +321,21 @@ function ReactionArrow({
 
   return (
     <div className="flex flex-col items-center justify-center px-2">
-      <div className="min-h-[16px] text-center font-mono text-[10px] leading-tight text-[#1A1A1A]/60">
+      <div
+        className="min-h-[16px] text-center text-[10px] leading-tight text-[#A8483B]"
+        style={MONO}
+      >
         {above.map((line, i) => (
           <div key={`above-${i}`}>{line}</div>
         ))}
       </div>
-      <div className="text-4xl leading-none tracking-tighter text-[#CFFF00] drop-shadow-[0_0_1px_rgba(26,26,26,0.4)]">
+      <div className="text-3xl leading-none tracking-tighter text-[#1A1A1A]">
         {vertical ? "↓" : "⟶"}
       </div>
-      <div className="min-h-[16px] text-center text-[10px] italic leading-tight text-[#1A1A1A]/60">
+      <div
+        className="min-h-[16px] text-center text-[10px] italic leading-tight text-[#1A1A1A]/60"
+        style={SANS}
+      >
         {below.map((line, i) => (
           <div key={`below-${i}`}>{line}</div>
         ))}
@@ -318,10 +357,10 @@ function MiniCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-28 flex-col items-center rounded-xl border border-stone-200 bg-white p-3 text-left transition-colors hover:bg-stone-50"
+      className="flex w-28 flex-col items-center border border-[#1A1A1A]/20 bg-[#FDFBF5] p-3 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
     >
       {imageFailed ? (
-        <div className="flex h-20 w-full items-center justify-center rounded-lg bg-[#1A1A1A]/5 text-base text-[#1A1A1A]/40">
+        <div className="flex h-20 w-full items-center justify-center bg-[#1A1A1A]/5 text-base text-[#1A1A1A]/40">
           ?
         </div>
       ) : (
@@ -333,7 +372,10 @@ function MiniCard({
           onError={() => setImageFailed(true)}
         />
       )}
-      <p className="mt-2 w-full truncate text-center text-xs text-[#1A1A1A]">
+      <p
+        className="mt-2 w-full truncate text-center text-xs text-[#1A1A1A]"
+        style={SANS}
+      >
         {compound.name}
       </p>
     </button>

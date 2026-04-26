@@ -9,6 +9,7 @@ import InputPane, {
 } from "./components/InputPane";
 import ReactionPane from "./components/ReactionPane";
 import CompoundsPane from "./components/CompoundsPane";
+import TopNav from "./components/TopNav";
 
 type Compound = {
   name: string;
@@ -68,9 +69,15 @@ const DEFAULT_ASSIGNMENTS: PanelAssignments = {
 };
 
 const PANE_TITLES: Record<PaneType, string> = {
-  input: "Input",
-  reaction: "The Reaction",
+  input: "Source",
+  reaction: "Reaction",
   compounds: "Compounds",
+};
+
+const PANE_NUMERALS: Record<PaneType, string> = {
+  input: "§ 01",
+  reaction: "§ 02",
+  compounds: "§ 03",
 };
 
 const STORAGE_KEY = "stoich-panel-assignments";
@@ -84,6 +91,7 @@ const EMPTY_CONDITIONS: Conditions = {
 };
 
 const SERIF = { fontFamily: "var(--font-serif)" };
+const SANS = { fontFamily: "var(--font-sans)" };
 const MAX_CHARS = 50_000;
 
 async function extractPdfText(
@@ -651,65 +659,72 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#FAF7F2] lg:h-screen lg:overflow-hidden">
-      {/* Mobile fallback: vertical stack, no draggable panels */}
-      <div className="flex flex-col lg:hidden">
-        <section className="min-h-[80vh] border-b border-stone-200">
-          {renderPaneContent("input")}
-        </section>
-        <section className="min-h-[60vh] border-b border-stone-200">
-          {renderPaneContent("reaction")}
-        </section>
-        <section className="min-h-[60vh]">
-          {renderPaneContent("compounds")}
-        </section>
-      </div>
+    <main className="relative flex min-h-screen flex-col bg-[#FAF6EC] lg:h-screen lg:overflow-hidden">
+      <div aria-hidden className="paper-lines pointer-events-none fixed inset-0 z-0" />
+      <div aria-hidden className="paper-grain pointer-events-none fixed inset-0 z-0" />
 
-      {/* Desktop: resizable panel system */}
-      <div className="hidden h-screen lg:block">
-        <PanelGroup
-          direction="horizontal"
-          autoSaveId="stoich-horizontal"
-          className="h-full"
-        >
-          <Panel defaultSize={50} minSize={25} order={1}>
-            <PaneShell
-              slot="left"
-              assignment={panelAssignments.left}
-              onSwap={(t) => handleSwap("left", t)}
-            >
-              {renderPaneContent(panelAssignments.left)}
-            </PaneShell>
-          </Panel>
+      <TopNav />
 
-          <PanelResizeHandle className="group relative flex w-1 cursor-col-resize items-center justify-center bg-stone-200 transition-colors hover:bg-[#CFFF00] data-[resize-handle-state=drag]:bg-[#CFFF00]" />
+      <div className="relative z-10 flex flex-1 flex-col lg:overflow-hidden">
+        {/* Mobile fallback: vertical stack, no draggable panels */}
+        <div className="flex flex-col lg:hidden">
+          <section className="min-h-[80vh] border-b border-[#1A1A1A]/25">
+            {renderPaneContent("input")}
+          </section>
+          <section className="min-h-[60vh] border-b border-[#1A1A1A]/25">
+            {renderPaneContent("reaction")}
+          </section>
+          <section className="min-h-[60vh]">
+            {renderPaneContent("compounds")}
+          </section>
+        </div>
 
-          <Panel defaultSize={50} minSize={25} order={2}>
-            <PanelGroup direction="vertical" autoSaveId="stoich-vertical">
-              <Panel defaultSize={50} minSize={20} order={1}>
-                <PaneShell
-                  slot="topRight"
-                  assignment={panelAssignments.topRight}
-                  onSwap={(t) => handleSwap("topRight", t)}
-                >
-                  {renderPaneContent(panelAssignments.topRight)}
-                </PaneShell>
-              </Panel>
+        {/* Desktop: resizable panel system */}
+        <div className="hidden flex-1 lg:block">
+          <PanelGroup
+            direction="horizontal"
+            autoSaveId="stoich-horizontal"
+            className="h-full"
+          >
+            <Panel defaultSize={50} minSize={25} order={1}>
+              <PaneShell
+                slot="left"
+                assignment={panelAssignments.left}
+                onSwap={(t) => handleSwap("left", t)}
+              >
+                {renderPaneContent(panelAssignments.left)}
+              </PaneShell>
+            </Panel>
 
-              <PanelResizeHandle className="group relative flex h-1 cursor-row-resize items-center justify-center bg-stone-200 transition-colors hover:bg-[#CFFF00] data-[resize-handle-state=drag]:bg-[#CFFF00]" />
+            <PanelResizeHandle className="group relative flex w-px cursor-col-resize items-center justify-center bg-[#1A1A1A]/25 transition-colors hover:bg-[#A8483B] data-[resize-handle-state=drag]:bg-[#A8483B]" />
 
-              <Panel defaultSize={50} minSize={20} order={2}>
-                <PaneShell
-                  slot="bottomRight"
-                  assignment={panelAssignments.bottomRight}
-                  onSwap={(t) => handleSwap("bottomRight", t)}
-                >
-                  {renderPaneContent(panelAssignments.bottomRight)}
-                </PaneShell>
-              </Panel>
-            </PanelGroup>
-          </Panel>
-        </PanelGroup>
+            <Panel defaultSize={50} minSize={25} order={2}>
+              <PanelGroup direction="vertical" autoSaveId="stoich-vertical">
+                <Panel defaultSize={50} minSize={20} order={1}>
+                  <PaneShell
+                    slot="topRight"
+                    assignment={panelAssignments.topRight}
+                    onSwap={(t) => handleSwap("topRight", t)}
+                  >
+                    {renderPaneContent(panelAssignments.topRight)}
+                  </PaneShell>
+                </Panel>
+
+                <PanelResizeHandle className="group relative flex h-px cursor-row-resize items-center justify-center bg-[#1A1A1A]/25 transition-colors hover:bg-[#A8483B] data-[resize-handle-state=drag]:bg-[#A8483B]" />
+
+                <Panel defaultSize={50} minSize={20} order={2}>
+                  <PaneShell
+                    slot="bottomRight"
+                    assignment={panelAssignments.bottomRight}
+                    onSwap={(t) => handleSwap("bottomRight", t)}
+                  >
+                    {renderPaneContent(panelAssignments.bottomRight)}
+                  </PaneShell>
+                </Panel>
+              </PanelGroup>
+            </Panel>
+          </PanelGroup>
+        </div>
       </div>
 
       {drawerCompound && (
@@ -745,13 +760,19 @@ function PaneShell({
   }, [menuOpen]);
 
   return (
-    <div className="flex h-full flex-col bg-[#FAF7F2]">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3">
+    <div className="flex h-full flex-col bg-[#FAF6EC]">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#1A1A1A]/25 bg-[#FAF6EC]/60 px-3 backdrop-blur-[1px]">
         <h3
-          className="text-xs italic text-[#1A1A1A]/70"
-          style={{ fontFamily: "var(--font-serif)" }}
+          className="flex items-baseline gap-2 text-[13px] tracking-tight text-[#1A1A1A]"
+          style={SERIF}
         >
-          {PANE_TITLES[assignment]}
+          <span
+            className="text-[10px] tracking-[0.32em] uppercase text-[#A8483B]"
+            style={SANS}
+          >
+            {PANE_NUMERALS[assignment]}
+          </span>
+          <span>{PANE_TITLES[assignment]}</span>
         </h3>
         <div className="relative" onClick={(e) => e.stopPropagation()}>
           <button
@@ -759,12 +780,12 @@ function PaneShell({
             onClick={() => setMenuOpen((o) => !o)}
             title={`Swap ${PANE_TITLES[assignment]}`}
             aria-label={`Swap pane ${slot}`}
-            className="flex h-5 w-5 items-center justify-center rounded text-[#1A1A1A]/60 transition-colors hover:bg-[#1A1A1A]/10 hover:text-[#1A1A1A]"
+            className="flex h-6 w-6 items-center justify-center text-[#1A1A1A]/60 transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
           >
             ⇄
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-[120px] overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden border border-[#1A1A1A]/40 bg-[#FAF6EC]">
               {(["input", "reaction", "compounds"] as PaneType[]).map((t) => (
                 <button
                   key={t}
@@ -776,10 +797,12 @@ function PaneShell({
                   className={
                     "block w-full px-3 py-1.5 text-left text-xs transition-colors " +
                     (t === assignment
-                      ? "bg-[#CFFF00]/30 text-[#1A1A1A]"
-                      : "text-[#1A1A1A] hover:bg-stone-50")
+                      ? "bg-[#A8483B]/15 text-[#1A1A1A]"
+                      : "text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#FAF6EC]")
                   }
+                  style={SANS}
                 >
+                  <span className="text-[#A8483B]">{PANE_NUMERALS[t]}</span>{" "}
                   {PANE_TITLES[t]}
                   {t === assignment ? " ·" : ""}
                 </button>
@@ -861,15 +884,15 @@ function CompoundDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
-        className="absolute inset-0 bg-black/30"
+        className="absolute inset-0 bg-[#1A1A1A]/40"
         onClick={onClose}
         aria-hidden
       />
-      <aside className="relative h-full w-full max-w-[400px] overflow-y-auto bg-white p-6 shadow-2xl">
+      <aside className="relative h-full w-full max-w-[400px] overflow-y-auto border-l border-[#1A1A1A]/30 bg-[#FAF6EC] p-6 shadow-2xl">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full border border-[#1A1A1A]/15 bg-white px-2 py-0.5 text-sm text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
+          className="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center border border-[#1A1A1A]/40 bg-[#FAF6EC] text-sm text-[#1A1A1A]/70 transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
           aria-label="Close"
         >
           ✕
@@ -882,9 +905,9 @@ function CompoundDrawer({
           </p>
         </div>
 
-        <div className="mt-4 flex justify-center rounded-xl bg-white">
+        <div className="mt-4 flex justify-center border border-[#1A1A1A]/15 bg-white">
           {imageFailed ? (
-            <div className="flex h-48 w-full items-center justify-center rounded-xl bg-[#1A1A1A]/5 text-sm text-[#1A1A1A]/50">
+            <div className="flex h-48 w-full items-center justify-center bg-[#1A1A1A]/5 text-sm text-[#1A1A1A]/50">
               structure not in PubChem
             </div>
           ) : (
@@ -892,7 +915,7 @@ function CompoundDrawer({
             <img
               src={compound.image_url}
               alt={compound.name}
-              className="max-h-72 w-full rounded-xl bg-white object-contain"
+              className="max-h-72 w-full bg-white object-contain"
               onError={() => setImageFailed(true)}
             />
           )}
@@ -903,20 +926,25 @@ function CompoundDrawer({
           style={SERIF}
         >
           {compound.name}
+          <span className="text-[#A8483B]">.</span>
         </h2>
         <span
           className={
-            "mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wider " +
+            "mt-2 inline-block px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] " +
             (isProduct
-              ? "bg-[#CFFF00] text-[#1A1A1A]"
-              : "bg-[#1A1A1A]/10 text-[#1A1A1A]/70")
+              ? "bg-[#A8483B] text-[#FAF6EC]"
+              : "border border-[#1A1A1A]/30 bg-[#FAF6EC] text-[#1A1A1A]/70")
           }
+          style={SANS}
         >
-          {compound.role?.toUpperCase()}
+          {compound.role}
         </span>
 
         <section className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]/50">
+          <h3
+            className="text-[11px] uppercase tracking-[0.28em] text-[#A8483B]"
+            style={SANS}
+          >
             Identifiers
           </h3>
           <dl className="mt-2 space-y-2 text-xs">
@@ -933,7 +961,7 @@ function CompoundDrawer({
                 <button
                   type="button"
                   onClick={copySmiles}
-                  className="shrink-0 rounded-full border border-[#1A1A1A]/15 bg-white px-1.5 py-0.5 text-[9px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
+                  className="shrink-0 border border-[#1A1A1A]/30 bg-[#FAF6EC] px-1.5 py-0.5 text-[9px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
                 >
                   {copied ? "✓" : "copy"}
                 </button>
@@ -961,7 +989,10 @@ function CompoundDrawer({
         </section>
 
         <section className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]/50">
+          <h3
+            className="text-[11px] uppercase tracking-[0.28em] text-[#A8483B]"
+            style={SANS}
+          >
             Description
           </h3>
           <p className="mt-2 text-sm italic text-[#1A1A1A]/80">
@@ -970,7 +1001,10 @@ function CompoundDrawer({
         </section>
 
         <section className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]/50">
+          <h3
+            className="text-[11px] uppercase tracking-[0.28em] text-[#A8483B]"
+            style={SANS}
+          >
             External
           </h3>
           {infoLoading ? (
@@ -980,7 +1014,7 @@ function CompoundDrawer({
               href={pubchemUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-block text-sm text-[#1A1A1A] underline decoration-[#CFFF00] decoration-2 underline-offset-4 hover:opacity-80"
+              className="mt-2 inline-block text-sm text-[#1A1A1A] underline decoration-[#A8483B] decoration-2 underline-offset-4 hover:text-[#A8483B]"
             >
               PubChem CID {info?.cid} ↗
             </a>
@@ -1014,8 +1048,7 @@ function Skeleton({ className = "" }: { className?: string }) {
   return (
     <span
       className={
-        "inline-block h-3 w-24 animate-pulse rounded bg-[#1A1A1A]/10 " +
-        className
+        "inline-block h-3 w-24 animate-pulse bg-[#1A1A1A]/10 " + className
       }
     />
   );
