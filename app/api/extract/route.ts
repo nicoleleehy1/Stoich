@@ -8,8 +8,19 @@ const SYSTEM_PROMPT = `You are a chemistry information extraction tool. Read thi
 - role: 'reactant', 'product', 'catalyst', 'solvent', or 'mentioned'
 - one_line: a 12-word-or-less plain-English description of what this compound is
 
+Also extract reaction conditions: temperature, pressure, reaction time, yield. Return null for any field not mentioned in the paragraph. Only fill these if explicitly stated — don't guess.
+
 Return ONLY a JSON object with this exact shape:
-{"compounds": [{"name": "...", "iupac": "...", "smiles": "...", "role": "...", "one_line": "..."}]}
+{
+  "compounds": [{"name": "...", "iupac": "...", "smiles": "...", "role": "...", "one_line": "..."}],
+  "conditions": {
+    "temperature": "<e.g. '80°C' or null>",
+    "pressure": "<e.g. '1 atm' or null>",
+    "time": "<e.g. '2 h' or null>",
+    "yield": "<e.g. '87%' or null>",
+    "notes": "<one short string for anything else relevant, or null>"
+  }
+}
 
 No markdown, no commentary, no code fences. Just JSON.`;
 
@@ -19,6 +30,14 @@ type Compound = {
   smiles: string;
   role: string;
   one_line: string;
+};
+
+type Conditions = {
+  temperature: string | null;
+  pressure: string | null;
+  time: string | null;
+  yield: string | null;
+  notes: string | null;
 };
 
 function stripFences(s: string): string {
@@ -66,7 +85,7 @@ export async function POST(request: Request) {
 
     const cleaned = stripFences(raw);
 
-    let parsed: { compounds?: Compound[] };
+    let parsed: { compounds?: Compound[]; conditions?: Partial<Conditions> };
     try {
       parsed = JSON.parse(cleaned);
     } catch (e) {
@@ -81,7 +100,16 @@ export async function POST(request: Request) {
       )}/PNG`,
     }));
 
-    return Response.json({ compounds });
+    const c = parsed.conditions ?? {};
+    const conditions: Conditions = {
+      temperature: c.temperature ?? null,
+      pressure: c.pressure ?? null,
+      time: c.time ?? null,
+      yield: c.yield ?? null,
+      notes: c.notes ?? null,
+    };
+
+    return Response.json({ compounds, conditions });
   } catch (err) {
     console.error("extract failed", err);
     return Response.json({ error: "extraction failed" }, { status: 500 });
