@@ -1,6 +1,6 @@
 "use client";
 
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
 
 export type Compound = {
   name: string;
@@ -26,6 +26,35 @@ export type SearchResult = {
   source_text_preview: string;
   score: number;
 };
+
+export type HighlightColor = "yellow" | "green" | "blue" | "pink";
+
+export type Highlight = {
+  id: string;
+  extraction_id: string | null;
+  text: string;
+  start_offset: number;
+  end_offset: number;
+  color: HighlightColor;
+  note: string | null;
+  created_at: string;
+};
+
+export const HIGHLIGHT_COLORS: Record<HighlightColor, string> = {
+  yellow: "#FFF4A6",
+  green: "#C7E9C0",
+  blue: "#BFD7EA",
+  pink: "#F5C2D7",
+};
+
+export const HIGHLIGHT_BG: Record<HighlightColor, string> = {
+  yellow: "rgba(255, 244, 166, 0.4)",
+  green: "rgba(199, 233, 192, 0.4)",
+  blue: "rgba(191, 215, 234, 0.4)",
+  pink: "rgba(245, 194, 215, 0.4)",
+};
+
+const COLOR_ORDER: HighlightColor[] = ["yellow", "green", "blue", "pink"];
 
 const SERIF = { fontFamily: "var(--font-serif)" };
 
@@ -76,6 +105,18 @@ export default function InputPane(props: {
   onClear: () => void;
   onLoadExtraction: (id: string) => void;
   readSelectionFromTextarea: () => void;
+  highlights: Highlight[];
+  onCreateHighlight: (
+    start: number,
+    end: number,
+    color: HighlightColor,
+    note: string | null
+  ) => void;
+  onUpdateHighlight: (
+    id: string,
+    patch: { note?: string | null; color?: HighlightColor }
+  ) => void;
+  onDeleteHighlight: (id: string) => void;
 }) {
   const {
     text,
@@ -103,11 +144,65 @@ export default function InputPane(props: {
     onClear,
     onLoadExtraction,
     readSelectionFromTextarea,
+    highlights,
+    onCreateHighlight,
+    onUpdateHighlight,
+    onDeleteHighlight,
   } = props;
+
+  const [notePopoverOpen, setNotePopoverOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [highlightsExpanded, setHighlightsExpanded] = useState(false);
 
   const hasSelection = selectedText.trim().length > 0;
   const canSubmit = hasSelection || text.trim().length > 0;
   const showingSearch = searchResults !== null;
+
+  function getCurrentRange(): { start: number; end: number } | null {
+    const el = textareaRef.current;
+    if (!el) return null;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    if (end <= start) return null;
+    return { start, end };
+  }
+
+  function applyColor(color: HighlightColor) {
+    const range = getCurrentRange();
+    if (!range) return;
+    onCreateHighlight(range.start, range.end, color, null);
+  }
+
+  function openNote() {
+    const range = getCurrentRange();
+    if (!range) return;
+    setNoteDraft("");
+    setNotePopoverOpen(true);
+  }
+
+  function saveNote(color: HighlightColor) {
+    const range = getCurrentRange();
+    if (!range) {
+      setNotePopoverOpen(false);
+      return;
+    }
+    onCreateHighlight(
+      range.start,
+      range.end,
+      color,
+      noteDraft.trim() ? noteDraft.trim() : null
+    );
+    setNotePopoverOpen(false);
+    setNoteDraft("");
+  }
+
+  function focusHighlight(h: Highlight) {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (h.end_offset > el.value.length) return;
+    el.focus();
+    el.setSelectionRange(h.start_offset, h.end_offset);
+  }
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -233,18 +328,20 @@ export default function InputPane(props: {
           </p>
         )}
 
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            readSelectionFromTextarea();
-          }}
-          onSelect={readSelectionFromTextarea}
-          onKeyUp={readSelectionFromTextarea}
-          onMouseUp={readSelectionFromTextarea}
-          placeholder="Paste a paragraph from a chemistry paper, an organic chem textbook, a Wikipedia article on a drug..."
-          className="min-h-[200px] w-full flex-1 resize-none rounded-2xl border border-stone-200 bg-white p-5 text-base leading-relaxed text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
+        <HighlightedTextarea
+          text={text}
+          setText={setText}
+          highlights={highlights}
+          textareaRef={textareaRef}
+          readSelectionFromTextarea={readSelectionFromTextarea}
+          hasSelection={hasSelection}
+          notePopoverOpen={notePopoverOpen}
+          noteDraft={noteDraft}
+          setNoteDraft={setNoteDraft}
+          onApplyColor={applyColor}
+          onOpenNote={openNote}
+          onCloseNote={() => setNotePopoverOpen(false)}
+          onSaveNote={saveNote}
         />
 
         <div className="mt-3 flex items-center gap-2 text-xs">
@@ -295,8 +392,383 @@ export default function InputPane(props: {
             extraction failed, try again
           </p>
         )}
+
+        <HighlightsSection
+          highlights={highlights}
+          expanded={highlightsExpanded}
+          setExpanded={setHighlightsExpanded}
+          onFocus={focusHighlight}
+          onUpdate={onUpdateHighlight}
+          onDelete={onDeleteHighlight}
+        />
       </div>
     </div>
+  );
+}
+
+function HighlightedTextarea({
+  text,
+  setText,
+  highlights,
+  textareaRef,
+  readSelectionFromTextarea,
+  hasSelection,
+  notePopoverOpen,
+  noteDraft,
+  setNoteDraft,
+  onApplyColor,
+  onOpenNote,
+  onCloseNote,
+  onSaveNote,
+}: {
+  text: string;
+  setText: (s: string) => void;
+  highlights: Highlight[];
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  readSelectionFromTextarea: () => void;
+  hasSelection: boolean;
+  notePopoverOpen: boolean;
+  noteDraft: string;
+  setNoteDraft: (s: string) => void;
+  onApplyColor: (c: HighlightColor) => void;
+  onOpenNote: () => void;
+  onCloseNote: () => void;
+  onSaveNote: (color: HighlightColor) => void;
+}) {
+  function handleScroll(e: React.UIEvent<HTMLTextAreaElement>) {
+    const mirror = (e.currentTarget.parentElement?.querySelector(
+      "[data-mirror]"
+    ) as HTMLDivElement) ?? null;
+    if (mirror) {
+      mirror.scrollTop = e.currentTarget.scrollTop;
+      mirror.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  }
+
+  return (
+    <div className="relative w-full flex-1">
+      <div className="relative h-full min-h-[200px] w-full overflow-hidden rounded-2xl border border-stone-200 bg-white focus-within:border-[#1A1A1A]/40">
+        <div
+          data-mirror
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-5 text-base leading-relaxed"
+          style={{ color: "transparent" }}
+        >
+          {renderSegments(text, highlights)}
+        </div>
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            readSelectionFromTextarea();
+          }}
+          onSelect={readSelectionFromTextarea}
+          onKeyUp={readSelectionFromTextarea}
+          onMouseUp={readSelectionFromTextarea}
+          onScroll={handleScroll}
+          placeholder="Paste a paragraph from a chemistry paper, an organic chem textbook, a Wikipedia article on a drug..."
+          className="absolute inset-0 h-full w-full resize-none bg-transparent p-5 text-base leading-relaxed text-[#1A1A1A] caret-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:outline-none"
+        />
+
+        {hasSelection && !notePopoverOpen && (
+          <div
+            className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full border border-stone-200 bg-white p-1 shadow-md"
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            {COLOR_ORDER.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onApplyColor(c);
+                }}
+                title={`Highlight ${c}`}
+                aria-label={`Highlight ${c}`}
+                className="h-5 w-5 rounded-full border border-black/10 transition-transform hover:scale-110"
+                style={{ backgroundColor: HIGHLIGHT_COLORS[c] }}
+              />
+            ))}
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onOpenNote();
+              }}
+              className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-xs text-[#1A1A1A]/80 hover:bg-stone-50"
+              title="Add note"
+            >
+              💬 Note
+            </button>
+          </div>
+        )}
+
+        {notePopoverOpen && (
+          <div
+            className="absolute right-3 top-3 z-10 w-72 rounded-xl border border-stone-200 bg-white p-3 shadow-lg"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p className="mb-1 text-[10px] uppercase tracking-wider text-[#1A1A1A]/50">
+              Note
+            </p>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="What's interesting about this?"
+              autoFocus
+              className="h-20 w-full resize-none rounded-md border border-stone-200 bg-white p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
+            />
+            <p className="mt-2 mb-1 text-[10px] uppercase tracking-wider text-[#1A1A1A]/50">
+              Color
+            </p>
+            <div className="flex items-center gap-1">
+              {COLOR_ORDER.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => onSaveNote(c)}
+                  title={`Save with ${c}`}
+                  aria-label={`Save with ${c}`}
+                  className="h-5 w-5 rounded-full border border-black/10 transition-transform hover:scale-110"
+                  style={{ backgroundColor: HIGHLIGHT_COLORS[c] }}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={onCloseNote}
+                className="ml-auto rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function renderSegments(text: string, highlights: Highlight[]) {
+  const valid = highlights.filter(
+    (h) =>
+      h.start_offset >= 0 &&
+      h.end_offset <= text.length &&
+      h.start_offset < h.end_offset
+  );
+  if (valid.length === 0) return text;
+
+  type Event = { offset: number; kind: "start" | "end"; h: Highlight };
+  const events: Event[] = [];
+  for (const h of valid) {
+    events.push({ offset: h.start_offset, kind: "start", h });
+    events.push({ offset: h.end_offset, kind: "end", h });
+  }
+  events.sort((a, b) => {
+    if (a.offset !== b.offset) return a.offset - b.offset;
+    return a.kind === "end" ? -1 : 1;
+  });
+
+  const active: Highlight[] = [];
+  let cursor = 0;
+  const out: React.ReactNode[] = [];
+  let key = 0;
+
+  function emit(slice: string, current: Highlight[]) {
+    if (slice.length === 0) return;
+    if (current.length === 0) {
+      out.push(<span key={`p-${key++}`}>{slice}</span>);
+      return;
+    }
+    let node: React.ReactNode = slice;
+    for (const h of current) {
+      const bg = HIGHLIGHT_BG[h.color] ?? HIGHLIGHT_BG.yellow;
+      node = (
+        <span
+          key={`h-${h.id}-${key++}`}
+          style={{ backgroundColor: bg, borderRadius: 2 }}
+        >
+          {node}
+        </span>
+      );
+    }
+    out.push(<span key={`s-${key++}`}>{node}</span>);
+  }
+
+  for (const ev of events) {
+    if (ev.offset > cursor) {
+      emit(text.slice(cursor, ev.offset), active);
+      cursor = ev.offset;
+    }
+    if (ev.kind === "start") {
+      active.push(ev.h);
+    } else {
+      const idx = active.findIndex((a) => a.id === ev.h.id);
+      if (idx >= 0) active.splice(idx, 1);
+    }
+  }
+  if (cursor < text.length) emit(text.slice(cursor), active);
+
+  return <>{out}</>;
+}
+
+function HighlightsSection({
+  highlights,
+  expanded,
+  setExpanded,
+  onFocus,
+  onUpdate,
+  onDelete,
+}: {
+  highlights: Highlight[];
+  expanded: boolean;
+  setExpanded: (b: boolean) => void;
+  onFocus: (h: Highlight) => void;
+  onUpdate: (
+    id: string,
+    patch: { note?: string | null; color?: HighlightColor }
+  ) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (highlights.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-stone-200 pt-3">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between text-xs text-[#1A1A1A]/70 hover:text-[#1A1A1A]"
+      >
+        <span>
+          📝 {highlights.length}{" "}
+          {highlights.length === 1 ? "highlight" : "highlights"}
+        </span>
+        <span className="text-[10px]">{expanded ? "▼" : "▶"}</span>
+      </button>
+      {expanded && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {highlights.map((h) => (
+            <HighlightItem
+              key={h.id}
+              highlight={h}
+              onFocus={onFocus}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function HighlightItem({
+  highlight,
+  onFocus,
+  onUpdate,
+  onDelete,
+}: {
+  highlight: Highlight;
+  onFocus: (h: Highlight) => void;
+  onUpdate: (
+    id: string,
+    patch: { note?: string | null; color?: HighlightColor }
+  ) => void;
+  onDelete: (h: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(highlight.note ?? "");
+
+  function save() {
+    const value = draft.trim() ? draft.trim() : null;
+    onUpdate(highlight.id, { note: value });
+    setEditing(false);
+  }
+
+  function cancelEdit() {
+    setDraft(highlight.note ?? "");
+    setEditing(false);
+  }
+
+  const truncated =
+    highlight.text.length > 80
+      ? highlight.text.slice(0, 80) + "..."
+      : highlight.text;
+
+  return (
+    <li className="group relative rounded-lg border border-stone-200 bg-white p-2.5">
+      <div className="flex items-start gap-2">
+        <span
+          className="mt-1 inline-block h-3 w-3 shrink-0 rounded-full border border-black/10"
+          style={{ backgroundColor: HIGHLIGHT_COLORS[highlight.color] }}
+          title={highlight.color}
+        />
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => onFocus(highlight)}
+            className="block w-full text-left text-xs text-[#1A1A1A] hover:underline"
+          >
+            <span
+              className="rounded-sm px-0.5"
+              style={{
+                backgroundColor: HIGHLIGHT_BG[highlight.color],
+              }}
+            >
+              {truncated}
+            </span>
+          </button>
+          {editing ? (
+            <div className="mt-2">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Add a note..."
+                autoFocus
+                className="h-16 w-full resize-none rounded-md border border-stone-200 bg-white p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
+              />
+              <div className="mt-1 flex gap-1">
+                <button
+                  type="button"
+                  onClick={save}
+                  className="rounded-full bg-[#CFFF00] px-2 py-0.5 text-[10px] font-medium text-[#1A1A1A]"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="rounded-full border border-stone-200 px-2 py-0.5 text-[10px] text-[#1A1A1A]/70"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(highlight.note ?? "");
+                setEditing(true);
+              }}
+              className="mt-1 block w-full text-left text-[11px] italic text-[#1A1A1A]/60 hover:text-[#1A1A1A]/80"
+            >
+              {highlight.note ? highlight.note : "+ add note"}
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onDelete(highlight.id)}
+          className="opacity-0 transition-opacity group-hover:opacity-100"
+          title="Delete"
+          aria-label="Delete highlight"
+        >
+          <span className="text-xs text-[#1A1A1A]/50 hover:text-red-600">
+            ✕
+          </span>
+        </button>
+      </div>
+    </li>
   );
 }
 

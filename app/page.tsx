@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import Mol3D from "./components/Mol3D";
-import InputPane from "./components/InputPane";
+import InputPane, {
+  type Highlight,
+  type HighlightColor,
+} from "./components/InputPane";
 import ReactionPane from "./components/ReactionPane";
 import CompoundsPane from "./components/CompoundsPane";
 
@@ -193,6 +196,9 @@ export default function Home() {
     useState<PanelAssignments>(DEFAULT_ASSIGNMENTS);
   const [assignmentsHydrated, setAssignmentsHydrated] = useState(false);
 
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [extractionId, setExtractionId] = useState<string | null>(null);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -332,17 +338,129 @@ export default function Home() {
     setSelectedText("");
     setPdfInfo(null);
     setPdfError(null);
+    setHighlights([]);
+    setExtractionId(null);
+  }, []);
+
+  function localHighlightId(): string {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  const createHighlight = useCallback(
+    async (
+      start: number,
+      end: number,
+      color: HighlightColor,
+      note: string | null
+    ) => {
+      if (start >= end) return;
+      const el = textareaRef.current;
+      if (!el) return;
+      const sliceText = el.value.slice(start, end);
+      if (!sliceText.trim()) return;
+
+      const tempId = localHighlightId();
+      const optimistic: Highlight = {
+        id: tempId,
+        extraction_id: extractionId,
+        text: sliceText,
+        start_offset: start,
+        end_offset: end,
+        color,
+        note,
+        created_at: new Date().toISOString(),
+      };
+      setHighlights((prev) =>
+        [...prev, optimistic].sort(
+          (a, b) => a.start_offset - b.start_offset
+        )
+      );
+
+      if (extractionId) {
+        try {
+          const res = await fetch("/api/highlights", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              extraction_id: extractionId,
+              text: sliceText,
+              start_offset: start,
+              end_offset: end,
+              color,
+              note,
+            }),
+          });
+          if (res.ok) {
+            const saved = (await res.json()) as Highlight;
+            setHighlights((prev) =>
+              prev.map((h) => (h.id === tempId ? saved : h))
+            );
+          }
+        } catch (e) {
+          console.error("highlight POST failed", e);
+        }
+      }
+    },
+    [extractionId]
+  );
+
+  const updateHighlight = useCallback(
+    async (
+      id: string,
+      patch: { note?: string | null; color?: HighlightColor }
+    ) => {
+      setHighlights((prev) =>
+        prev.map((h) => (h.id === id ? { ...h, ...patch } : h))
+      );
+      const isStaged = id.startsWith("local-") || id.length !== 24;
+      if (isStaged) return;
+      try {
+        await fetch("/api/highlights", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, ...patch }),
+        });
+      } catch (e) {
+        console.error("highlight PATCH failed", e);
+      }
+    },
+    []
+  );
+
+  const deleteHighlight = useCallback(async (id: string) => {
+    setHighlights((prev) => prev.filter((h) => h.id !== id));
+    const isStaged = id.startsWith("local-") || id.length !== 24;
+    if (isStaged) return;
+    try {
+      await fetch(`/api/highlights?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.error("highlight DELETE failed", e);
+    }
   }, []);
 
   const handleSubmit = useCallback(async () => {
     const textToSend = selectedText.trim() || text.trim();
     if (!textToSend || loading) return;
+
+    const wasStaged = extractionId === null;
+    const stagedHighlights = wasStaged ? [...highlights] : [];
+
     setLoading(true);
     setErrored(false);
     setSteps([]);
     setCompounds([]);
     setConditions(EMPTY_CONDITIONS);
     setHasRun(true);
+    if (!wasStaged) {
+      setHighlights([]);
+      setExtractionId(null);
+    }
+
     try {
       const res = await fetch("/api/extract", {
         method: "POST",
@@ -359,6 +477,41 @@ export default function Home() {
       setSteps(data.steps ?? []);
       setCompounds(data.compounds ?? []);
       setConditions({ ...EMPTY_CONDITIONS, ...(data.conditions ?? {}) });
+
+      if (data.extraction_id) {
+        setExtractionId(data.extraction_id);
+        if (stagedHighlights.length > 0) {
+          const persisted: Highlight[] = [];
+          for (const h of stagedHighlights) {
+            try {
+              const r = await fetch("/api/highlights", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  extraction_id: data.extraction_id,
+                  text: h.text,
+                  start_offset: h.start_offset,
+                  end_offset: h.end_offset,
+                  color: h.color,
+                  note: h.note,
+                }),
+              });
+              if (r.ok) {
+                persisted.push((await r.json()) as Highlight);
+              } else {
+                persisted.push(h);
+              }
+            } catch (e) {
+              console.error("staged highlight persist failed", e);
+              persisted.push(h);
+            }
+          }
+          setHighlights(
+            persisted.sort((a, b) => a.start_offset - b.start_offset)
+          );
+        }
+      }
+
       refreshHistory();
     } catch (err) {
       console.error(err);
@@ -366,7 +519,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [selectedText, text, loading, refreshHistory]);
+  }, [selectedText, text, loading, refreshHistory, extractionId, highlights]);
 
   const loadExtraction = useCallback(async (id: string) => {
     try {
@@ -387,6 +540,18 @@ export default function Home() {
       setErrored(false);
       setPdfInfo(null);
       setPdfError(null);
+      setExtractionId(id);
+
+      try {
+        const hr = await fetch(
+          `/api/highlights?extraction_id=${encodeURIComponent(id)}`
+        );
+        const hd = (await hr.json()) as { items?: Highlight[] };
+        setHighlights(hd.items ?? []);
+      } catch (e) {
+        console.error("highlight fetch failed", e);
+        setHighlights([]);
+      }
     } catch (e) {
       console.error("load extraction failed", e);
     }
@@ -452,6 +617,10 @@ export default function Home() {
           onClear={clearText}
           onLoadExtraction={loadExtraction}
           readSelectionFromTextarea={readSelectionFromTextarea}
+          highlights={highlights}
+          onCreateHighlight={createHighlight}
+          onUpdateHighlight={updateHighlight}
+          onDeleteHighlight={deleteHighlight}
         />
       );
     }
