@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import Mol3D from "./components/Mol3D";
+import InputPane from "./components/InputPane";
+import ReactionPane from "./components/ReactionPane";
+import CompoundsPane from "./components/CompoundsPane";
 
 type Compound = {
   name: string;
@@ -19,6 +24,54 @@ type Conditions = {
   notes: string | null;
 };
 
+type Step = {
+  step_number: number;
+  description: string;
+  compounds: Compound[];
+  conditions: Conditions;
+};
+
+type HistoryItem = {
+  id: string;
+  source_text_preview: string;
+  compound_count: number;
+  primary_product_name: string;
+  created_at: string;
+};
+
+type SearchResult = {
+  extraction_id: string;
+  compound_name: string;
+  one_line: string;
+  source_text_preview: string;
+  score: number;
+};
+
+type CompoundInfo = {
+  formula: string | null;
+  weight: string | null;
+  iupac_from_pubchem: string | null;
+  cid: number | null;
+};
+
+type PaneType = "input" | "reaction" | "compounds";
+type Slot = "left" | "topRight" | "bottomRight";
+type PanelAssignments = Record<Slot, PaneType>;
+
+const DEFAULT_ASSIGNMENTS: PanelAssignments = {
+  left: "input",
+  topRight: "reaction",
+  bottomRight: "compounds",
+};
+
+const PANE_TITLES: Record<PaneType, string> = {
+  input: "Input",
+  reaction: "The Reaction",
+  compounds: "Compounds",
+};
+
+const STORAGE_KEY = "stoich-panel-assignments";
+
 const EMPTY_CONDITIONS: Conditions = {
   temperature: null,
   pressure: null,
@@ -26,9 +79,6 @@ const EMPTY_CONDITIONS: Conditions = {
   yield: null,
   notes: null,
 };
-
-const EXAMPLE_TEXT =
-  "We synthesized aspirin (acetylsalicylic acid) by reacting salicylic acid with acetic anhydride in the presence of a sulfuric acid catalyst. The product was purified by recrystallization from ethanol, yielding white crystalline needles characteristic of pure acetylsalicylic acid.";
 
 const SERIF = { fontFamily: "var(--font-serif)" };
 const MAX_CHARS = 50_000;
@@ -63,10 +113,47 @@ async function extractPdfText(
   return { text: pageTexts.join("\n\n"), pageCount: doc.numPages };
 }
 
+function stepHasReaction(step: Step): boolean {
+  const r = step.compounds.filter((c) => c.role?.toLowerCase() === "reactant");
+  const p = step.compounds.filter((c) => c.role?.toLowerCase() === "product");
+  return r.length > 0 && p.length > 0;
+}
+
+function isValidAssignments(v: unknown): v is PanelAssignments {
+  if (!v || typeof v !== "object") return false;
+  const a = v as Record<string, unknown>;
+  const slots: Slot[] = ["left", "topRight", "bottomRight"];
+  const types = new Set(["input", "reaction", "compounds"]);
+  const seen = new Set<string>();
+  for (const s of slots) {
+    const t = a[s];
+    if (typeof t !== "string" || !types.has(t)) return false;
+    if (seen.has(t)) return false;
+    seen.add(t);
+  }
+  return true;
+}
+
+function swapAssignments(
+  assignments: PanelAssignments,
+  slot: Slot,
+  newType: PaneType
+): PanelAssignments {
+  if (assignments[slot] === newType) return assignments;
+  const otherSlot = (Object.keys(assignments) as Slot[]).find(
+    (s) => assignments[s] === newType
+  );
+  const next = { ...assignments };
+  next[slot] = newType;
+  if (otherSlot) next[otherSlot] = assignments[slot];
+  return next;
+}
+
 export default function Home() {
   const [text, setText] = useState("");
   const [selectedText, setSelectedText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [compounds, setCompounds] = useState<Compound[]>([]);
   const [conditions, setConditions] = useState<Conditions>(EMPTY_CONDITIONS);
   const [errored, setErrored] = useState(false);
@@ -82,10 +169,55 @@ export default function Home() {
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyError, setHistoryError] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(
+    null
+  );
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const [drawerCompound, setDrawerCompound] = useState<Compound | null>(null);
+
+  const [viewMode, setViewMode] = useState<"equation" | "graph">("equation");
+
+  const [narrateLoading, setNarrateLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  function readSelectionFromTextarea() {
+  const [panelAssignments, setPanelAssignments] =
+    useState<PanelAssignments>(DEFAULT_ASSIGNMENTS);
+  const [assignmentsHydrated, setAssignmentsHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (isValidAssignments(parsed)) {
+          setPanelAssignments(parsed);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setAssignmentsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!assignmentsHydrated) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(panelAssignments));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [panelAssignments, assignmentsHydrated]);
+
+  const readSelectionFromTextarea = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
     const start = el.selectionStart ?? 0;
@@ -95,7 +227,7 @@ export default function Home() {
     } else {
       setSelectedText("");
     }
-  }
+  }, []);
 
   useEffect(() => {
     function onMouseUp() {
@@ -105,11 +237,70 @@ export default function Home() {
     }
     document.addEventListener("mouseup", onMouseUp);
     return () => document.removeEventListener("mouseup", onMouseUp);
+  }, [readSelectionFromTextarea]);
+
+  useEffect(() => {
+    return () => {
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    };
   }, []);
 
-  async function handleFile(file: File) {
+  const refreshHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/history");
+      const data = (await res.json()) as {
+        items?: HistoryItem[];
+        error?: string;
+      };
+      setHistory(data.items ?? []);
+      setHistoryError(Boolean(data.error));
+    } catch (e) {
+      console.error(e);
+      setHistoryError(true);
+      setHistory([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshHistory();
+  }, [refreshHistory]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q }),
+        });
+        const data = (await res.json()) as {
+          results?: SearchResult[];
+          error?: string;
+        };
+        setSearchResults(data.results ?? []);
+      } catch (e) {
+        console.error(e);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const handleFile = useCallback(async (file: File) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+    if (
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
       setPdfError("That doesn't look like a PDF.");
       return;
     }
@@ -134,20 +325,21 @@ export default function Home() {
     } finally {
       setPdfLoading(false);
     }
-  }
+  }, []);
 
-  function clearText() {
+  const clearText = useCallback(() => {
     setText("");
     setSelectedText("");
     setPdfInfo(null);
     setPdfError(null);
-  }
+  }, []);
 
-  async function handleSubmit() {
+  const handleSubmit = useCallback(async () => {
     const textToSend = selectedText.trim() || text.trim();
     if (!textToSend || loading) return;
     setLoading(true);
     setErrored(false);
+    setSteps([]);
     setCompounds([]);
     setConditions(EMPTY_CONDITIONS);
     setHasRun(true);
@@ -159,314 +351,329 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as {
+        steps?: Step[];
         compounds: Compound[];
         conditions?: Conditions;
+        extraction_id?: string;
       };
+      setSteps(data.steps ?? []);
       setCompounds(data.compounds ?? []);
       setConditions({ ...EMPTY_CONDITIONS, ...(data.conditions ?? {}) });
+      refreshHistory();
     } catch (err) {
       console.error(err);
       setErrored(true);
     } finally {
       setLoading(false);
     }
+  }, [selectedText, text, loading, refreshHistory]);
+
+  const loadExtraction = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/extraction/${id}`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = (await res.json()) as {
+        source_text: string;
+        steps?: Step[];
+        compounds: Compound[];
+        conditions: Conditions;
+      };
+      setText(data.source_text ?? "");
+      setSelectedText("");
+      setSteps(data.steps ?? []);
+      setCompounds(data.compounds ?? []);
+      setConditions({ ...EMPTY_CONDITIONS, ...(data.conditions ?? {}) });
+      setHasRun(true);
+      setErrored(false);
+      setPdfInfo(null);
+      setPdfError(null);
+    } catch (e) {
+      console.error("load extraction failed", e);
+    }
+  }, []);
+
+  const handleNarrate = useCallback(async () => {
+    if (narrateLoading || compounds.length === 0) return;
+    setNarrateLoading(true);
+    try {
+      const res = await fetch("/api/narrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ compounds, conditions }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const blob = await res.blob();
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      audioUrlRef.current = url;
+      if (audioRef.current) {
+        audioRef.current.src = url;
+        await audioRef.current.play().catch((e) => console.error(e));
+      }
+    } catch (e) {
+      console.error("narrate failed", e);
+    } finally {
+      setNarrateLoading(false);
+    }
+  }, [narrateLoading, compounds, conditions]);
+
+  const reactionSteps = steps.filter(stepHasReaction);
+
+  const handleSwap = useCallback((slot: Slot, newType: PaneType) => {
+    setPanelAssignments((cur) => swapAssignments(cur, slot, newType));
+  }, []);
+
+  function renderPaneContent(type: PaneType) {
+    if (type === "input") {
+      return (
+        <InputPane
+          text={text}
+          setText={setText}
+          selectedText={selectedText}
+          loading={loading}
+          errored={errored}
+          pdfLoading={pdfLoading}
+          pdfError={pdfError}
+          pdfInfo={pdfInfo}
+          dragOver={dragOver}
+          setDragOver={setDragOver}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          history={history}
+          historyError={historyError}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchResults={searchResults}
+          searchLoading={searchLoading}
+          textareaRef={textareaRef}
+          fileInputRef={fileInputRef}
+          onSubmit={handleSubmit}
+          onFile={handleFile}
+          onClear={clearText}
+          onLoadExtraction={loadExtraction}
+          readSelectionFromTextarea={readSelectionFromTextarea}
+        />
+      );
+    }
+    if (type === "reaction") {
+      return (
+        <ReactionPane
+          loading={loading}
+          hasRun={hasRun}
+          reactionSteps={reactionSteps}
+          compoundsCount={compounds.length}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          narrateLoading={narrateLoading}
+          onNarrate={handleNarrate}
+          audioRef={audioRef}
+          onPickCompound={(c) => setDrawerCompound(c)}
+        />
+      );
+    }
+    return (
+      <CompoundsPane
+        loading={loading}
+        hasRun={hasRun}
+        compounds={compounds}
+        onPickCompound={(c) => setDrawerCompound(c)}
+      />
+    );
   }
 
-  const reactants = compounds.filter((c) => c.role?.toLowerCase() === "reactant");
-  const products = compounds.filter((c) => c.role?.toLowerCase() === "product");
-  const catalysts = compounds.filter((c) => c.role?.toLowerCase() === "catalyst");
-  const solvents = compounds.filter((c) => c.role?.toLowerCase() === "solvent");
-  const showReaction =
-    compounds.length > 1 && reactants.length > 0 && products.length > 0;
-
-  const hasSelection = selectedText.trim().length > 0;
-  const canSubmit = hasSelection || text.trim().length > 0;
-
   return (
-    <main className="bg-[#FAF7F2] lg:grid lg:h-screen lg:grid-cols-2 lg:overflow-hidden">
-      <section className="flex flex-col border-stone-200 p-6 lg:h-screen lg:border-r lg:overflow-y-auto">
-        <header className="mb-4">
-          <h1 className="text-4xl tracking-tight" style={SERIF}>
-            Mol Lens
-          </h1>
-          <p className="mt-1 text-sm text-[#1A1A1A]/60">
-            Paste a chemistry paragraph. See the molecules and the reaction.
-          </p>
-        </header>
-
-        <div
-          onClick={() => !pdfLoading && fileInputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (!pdfLoading) setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            if (pdfLoading) return;
-            const file = e.dataTransfer.files?.[0];
-            if (file) handleFile(file);
-          }}
-          className={
-            "mb-3 cursor-pointer rounded-lg border-2 border-dashed p-4 text-center text-sm transition-colors " +
-            (pdfLoading
-              ? "cursor-wait border-stone-300 bg-white text-[#1A1A1A]/50"
-              : dragOver
-                ? "border-[#CFFF00] bg-[#CFFF00]/10 text-[#1A1A1A]"
-                : "border-stone-300 bg-white text-[#1A1A1A]/70 hover:bg-stone-50")
-          }
-        >
-          {pdfLoading ? "Reading PDF..." : "Drop a PDF here or click to upload"}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-              e.target.value = "";
-            }}
-          />
-        </div>
-
-        {pdfError && <p className="mb-2 text-xs text-red-600">{pdfError}</p>}
-
-        {pdfInfo && (
-          <div className="mb-3 flex items-center gap-2 text-xs text-[#1A1A1A]/60">
-            <span className="truncate">
-              Loaded:{" "}
-              <span className="font-medium text-[#1A1A1A]/80">{pdfInfo.name}</span>{" "}
-              ({pdfInfo.pages} {pdfInfo.pages === 1 ? "page" : "pages"},{" "}
-              {pdfInfo.chars.toLocaleString()} chars)
-            </span>
-            <button
-              type="button"
-              onClick={clearText}
-              className="shrink-0 rounded-full border border-[#1A1A1A]/15 bg-white px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
-              title="Clear"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {pdfInfo?.truncated && (
-          <p className="mb-2 text-xs italic text-[#1A1A1A]/60">
-            PDF was longer than 50k chars, showing first portion. Highlight a section to extract.
-          </p>
-        )}
-
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            readSelectionFromTextarea();
-          }}
-          onSelect={readSelectionFromTextarea}
-          onKeyUp={readSelectionFromTextarea}
-          onMouseUp={readSelectionFromTextarea}
-          placeholder="Paste a paragraph from a chemistry paper, an organic chem textbook, a Wikipedia article on a drug..."
-          className="min-h-[200px] w-full flex-1 resize-none rounded-2xl border border-stone-200 bg-white p-5 text-base leading-relaxed text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A]/40 focus:outline-none"
-        />
-
-        <div className="mt-3 flex items-center gap-2 text-xs">
-          {hasSelection ? (
-            <>
-              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#CFFF00]" />
-              <span className="truncate italic text-[#1A1A1A]/70">
-                Extracting selection: {selectedText.slice(0, 80)}
-                {selectedText.length > 80 ? "..." : ""}
-              </span>
-            </>
-          ) : (
-            <span className="text-[#1A1A1A]/50">Extracting full paragraph</span>
-          )}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setText(EXAMPLE_TEXT)}
-            className="rounded-full border border-[#1A1A1A]/20 bg-white px-4 py-2 text-sm text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A]/5"
-          >
-            Try an example
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading || !canSubmit}
-            className="rounded-full bg-[#CFFF00] px-6 py-3 text-base font-medium text-[#1A1A1A] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading
-              ? "Reading paragraph..."
-              : hasSelection
-                ? "Extract selection"
-                : "Extract molecules"}
-          </button>
-        </div>
-
-        {errored && (
-          <p className="mt-3 text-sm text-[#1A1A1A]/70">
-            extraction failed, try again
-          </p>
-        )}
-      </section>
-
-      <div className="flex flex-col lg:h-screen lg:overflow-hidden">
-        <section className="flex flex-col border-stone-200 p-6 lg:h-1/2 lg:border-b lg:overflow-y-auto">
-          <header className="mb-4 shrink-0">
-            <h2 className="text-2xl tracking-tight" style={SERIF}>
-              The Reaction
-            </h2>
-            <p className="text-sm text-[#1A1A1A]/60">as Gemma understood it</p>
-          </header>
-
-          <div className="flex flex-1 items-center justify-center overflow-x-auto">
-            {loading ? (
-              <p className="text-sm text-[#1A1A1A]/50">Reading paragraph...</p>
-            ) : !hasRun ? (
-              <p className="text-sm text-[#1A1A1A]/50">
-                Extract a paragraph to see the reaction
-              </p>
-            ) : !showReaction ? (
-              <p className="text-sm text-[#1A1A1A]/50">No clear reaction detected</p>
-            ) : (
-              <div className="flex min-w-max items-center justify-center gap-3 px-2">
-                {reactants.map((c, i) => (
-                  <div key={`r-${i}`} className="flex items-center gap-3">
-                    <MiniCard compound={c} />
-                    {i < reactants.length - 1 && (
-                      <span className="text-2xl text-[#1A1A1A]/40">+</span>
-                    )}
-                  </div>
-                ))}
-                <ReactionArrow
-                  catalysts={catalysts}
-                  solvents={solvents}
-                  conditions={conditions}
-                />
-                {conditions.yield && (
-                  <span className="rounded-full bg-[#1A1A1A]/10 px-2.5 py-1 text-[10px] font-mono text-[#1A1A1A]/70">
-                    yield: {conditions.yield}
-                  </span>
-                )}
-                {products.map((c, i) => (
-                  <div key={`p-${i}`} className="flex items-center gap-3">
-                    <MiniCard compound={c} />
-                    {i < products.length - 1 && (
-                      <span className="text-2xl text-[#1A1A1A]/40">+</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+    <main className="min-h-screen bg-[#FAF7F2] lg:h-screen lg:overflow-hidden">
+      {/* Mobile fallback: vertical stack, no draggable panels */}
+      <div className="flex flex-col lg:hidden">
+        <section className="min-h-[80vh] border-b border-stone-200">
+          {renderPaneContent("input")}
         </section>
-
-        <section className="flex flex-col p-6 lg:h-1/2 lg:overflow-y-auto">
-          <header className="mb-4 shrink-0">
-            <h2 className="text-2xl tracking-tight" style={SERIF}>
-              All compounds detected
-            </h2>
-            <p className="text-sm text-[#1A1A1A]/60">
-              {compounds.length > 0
-                ? `${compounds.length} ${compounds.length === 1 ? "molecule" : "molecules"}`
-                : "0 molecules"}
-            </p>
-          </header>
-
-          <div className="flex-1">
-            {loading ? (
-              <p className="text-sm text-[#1A1A1A]/50">Reading paragraph...</p>
-            ) : compounds.length === 0 ? (
-              <p className="text-sm text-[#1A1A1A]/50">
-                {hasRun ? "No compounds detected" : "Compounds will appear here"}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-                {compounds.map((c, i) => (
-                  <CompoundCard key={`${c.name}-${i}`} compound={c} />
-                ))}
-              </div>
-            )}
-          </div>
+        <section className="min-h-[60vh] border-b border-stone-200">
+          {renderPaneContent("reaction")}
+        </section>
+        <section className="min-h-[60vh]">
+          {renderPaneContent("compounds")}
         </section>
       </div>
+
+      {/* Desktop: resizable panel system */}
+      <div className="hidden h-screen lg:block">
+        <PanelGroup
+          direction="horizontal"
+          autoSaveId="stoich-horizontal"
+          className="h-full"
+        >
+          <Panel defaultSize={50} minSize={25} order={1}>
+            <PaneShell
+              slot="left"
+              assignment={panelAssignments.left}
+              onSwap={(t) => handleSwap("left", t)}
+            >
+              {renderPaneContent(panelAssignments.left)}
+            </PaneShell>
+          </Panel>
+
+          <PanelResizeHandle className="group relative flex w-1 cursor-col-resize items-center justify-center bg-stone-200 transition-colors hover:bg-[#CFFF00] data-[resize-handle-state=drag]:bg-[#CFFF00]" />
+
+          <Panel defaultSize={50} minSize={25} order={2}>
+            <PanelGroup direction="vertical" autoSaveId="stoich-vertical">
+              <Panel defaultSize={50} minSize={20} order={1}>
+                <PaneShell
+                  slot="topRight"
+                  assignment={panelAssignments.topRight}
+                  onSwap={(t) => handleSwap("topRight", t)}
+                >
+                  {renderPaneContent(panelAssignments.topRight)}
+                </PaneShell>
+              </Panel>
+
+              <PanelResizeHandle className="group relative flex h-1 cursor-row-resize items-center justify-center bg-stone-200 transition-colors hover:bg-[#CFFF00] data-[resize-handle-state=drag]:bg-[#CFFF00]" />
+
+              <Panel defaultSize={50} minSize={20} order={2}>
+                <PaneShell
+                  slot="bottomRight"
+                  assignment={panelAssignments.bottomRight}
+                  onSwap={(t) => handleSwap("bottomRight", t)}
+                >
+                  {renderPaneContent(panelAssignments.bottomRight)}
+                </PaneShell>
+              </Panel>
+            </PanelGroup>
+          </Panel>
+        </PanelGroup>
+      </div>
+
+      {drawerCompound && (
+        <CompoundDrawer
+          compound={drawerCompound}
+          onClose={() => setDrawerCompound(null)}
+        />
+      )}
     </main>
   );
 }
 
-function ReactionArrow({
-  catalysts,
-  solvents,
-  conditions,
+function PaneShell({
+  slot,
+  assignment,
+  onSwap,
+  children,
 }: {
-  catalysts: Compound[];
-  solvents: Compound[];
-  conditions: Conditions;
+  slot: Slot;
+  assignment: PaneType;
+  onSwap: (t: PaneType) => void;
+  children: React.ReactNode;
 }) {
-  const above: string[] = [
-    ...catalysts.map((c) => c.name),
-    ...(conditions.temperature ? [conditions.temperature] : []),
-    ...(conditions.pressure ? [conditions.pressure] : []),
-  ];
-  const below: string[] = [
-    ...solvents.map((s) => s.name),
-    ...(conditions.time ? [conditions.time] : []),
-  ];
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc() {
+      setMenuOpen(false);
+    }
+    document.addEventListener("click", onDoc);
+    return () => document.removeEventListener("click", onDoc);
+  }, [menuOpen]);
 
   return (
-    <div className="flex flex-col items-center justify-center px-2">
-      <div className="min-h-[16px] text-center font-mono text-[10px] leading-tight text-[#1A1A1A]/60">
-        {above.map((line, i) => (
-          <div key={`above-${i}`}>{line}</div>
-        ))}
-      </div>
-      <div className="text-4xl leading-none tracking-tighter text-[#CFFF00] drop-shadow-[0_0_1px_rgba(26,26,26,0.4)]">
-        ⟶
-      </div>
-      <div className="min-h-[16px] text-center text-[10px] italic leading-tight text-[#1A1A1A]/60">
-        {below.map((line, i) => (
-          <div key={`below-${i}`}>{line}</div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MiniCard({ compound }: { compound: Compound }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  return (
-    <div className="flex w-28 flex-col items-center rounded-xl border border-stone-200 bg-white p-3">
-      {imageFailed ? (
-        <div className="flex h-20 w-full items-center justify-center rounded-lg bg-[#1A1A1A]/5 text-base text-[#1A1A1A]/40">
-          ?
+    <div className="flex h-full flex-col bg-[#FAF7F2]">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3">
+        <h3
+          className="text-xs italic text-[#1A1A1A]/70"
+          style={{ fontFamily: "var(--font-serif)" }}
+        >
+          {PANE_TITLES[assignment]}
+        </h3>
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            title={`Swap ${PANE_TITLES[assignment]}`}
+            aria-label={`Swap pane ${slot}`}
+            className="flex h-5 w-5 items-center justify-center rounded text-[#1A1A1A]/60 transition-colors hover:bg-[#1A1A1A]/10 hover:text-[#1A1A1A]"
+          >
+            ⇄
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-[120px] overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg">
+              {(["input", "reaction", "compounds"] as PaneType[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    onSwap(t);
+                    setMenuOpen(false);
+                  }}
+                  className={
+                    "block w-full px-3 py-1.5 text-left text-xs transition-colors " +
+                    (t === assignment
+                      ? "bg-[#CFFF00]/30 text-[#1A1A1A]"
+                      : "text-[#1A1A1A] hover:bg-stone-50")
+                  }
+                >
+                  {PANE_TITLES[t]}
+                  {t === assignment ? " ·" : ""}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={compound.image_url}
-          alt={compound.name}
-          className="h-20 max-h-20 w-full object-contain"
-          onError={() => setImageFailed(true)}
-        />
-      )}
-      <p className="mt-2 w-full truncate text-center text-xs text-[#1A1A1A]">
-        {compound.name}
-      </p>
+      </div>
+      <div className="flex-1 overflow-hidden">{children}</div>
     </div>
   );
 }
 
-function CompoundCard({ compound }: { compound: Compound }) {
+function CompoundDrawer({
+  compound,
+  onClose,
+}: {
+  compound: Compound;
+  onClose: () => void;
+}) {
+  const [info, setInfo] = useState<CompoundInfo | null>(null);
+  const [infoLoading, setInfoLoading] = useState(true);
   const [imageFailed, setImageFailed] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const isProduct = compound.role?.toLowerCase() === "product";
+
+  useEffect(() => {
+    let cancelled = false;
+    setInfoLoading(true);
+    setInfo(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/compound-info?smiles=${encodeURIComponent(compound.smiles)}`
+        );
+        const data = (await res.json()) as CompoundInfo;
+        if (!cancelled) setInfo(data);
+      } catch (e) {
+        console.error("compound-info fetch failed", e);
+        if (!cancelled)
+          setInfo({
+            formula: null,
+            weight: null,
+            iupac_from_pubchem: null,
+            cid: null,
+          });
+      } finally {
+        if (!cancelled) setInfoLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [compound.smiles]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   async function copySmiles() {
     try {
@@ -478,15 +685,59 @@ function CompoundCard({ compound }: { compound: Compound }) {
     }
   }
 
+  const pubchemUrl = info?.cid
+    ? `https://pubchem.ncbi.nlm.nih.gov/compound/${info.cid}`
+    : null;
+
   return (
-    <article className="flex w-full flex-col rounded-xl border border-stone-200 bg-white p-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="truncate text-sm font-bold text-[#1A1A1A]" title={compound.name}>
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div
+        className="absolute inset-0 bg-black/30"
+        onClick={onClose}
+        aria-hidden
+      />
+      <aside className="relative h-full w-full max-w-[400px] overflow-y-auto bg-white p-6 shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full border border-[#1A1A1A]/15 bg-white px-2 py-0.5 text-sm text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+
+        <div className="mt-2">
+          <Mol3D smiles={compound.smiles} height={280} />
+          <p className="mt-1 text-[10px] text-[#1A1A1A]/50">
+            3D model (drag to rotate, scroll to zoom)
+          </p>
+        </div>
+
+        <div className="mt-4 flex justify-center rounded-xl bg-white">
+          {imageFailed ? (
+            <div className="flex h-48 w-full items-center justify-center rounded-xl bg-[#1A1A1A]/5 text-sm text-[#1A1A1A]/50">
+              structure not in PubChem
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={compound.image_url}
+              alt={compound.name}
+              className="max-h-72 w-full rounded-xl bg-white object-contain"
+              onError={() => setImageFailed(true)}
+            />
+          )}
+        </div>
+
+        <h2
+          className="mt-5 text-2xl tracking-tight text-[#1A1A1A]"
+          style={SERIF}
+        >
           {compound.name}
-        </h3>
+        </h2>
         <span
           className={
-            "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-wider " +
+            "mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wider " +
             (isProduct
               ? "bg-[#CFFF00] text-[#1A1A1A]"
               : "bg-[#1A1A1A]/10 text-[#1A1A1A]/70")
@@ -494,52 +745,109 @@ function CompoundCard({ compound }: { compound: Compound }) {
         >
           {compound.role?.toUpperCase()}
         </span>
-      </div>
 
-      <div className="mt-2 flex justify-center rounded-lg bg-white">
-        {imageFailed ? (
-          <div className="flex h-24 w-full items-center justify-center rounded-lg bg-[#1A1A1A]/5 text-xs text-[#1A1A1A]/50">
-            not in PubChem
-          </div>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={compound.image_url}
-            alt={compound.name}
-            className="max-h-24 w-full rounded-lg bg-white object-contain"
-            onError={() => setImageFailed(true)}
-          />
-        )}
-      </div>
+        <section className="mt-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]/50">
+            Identifiers
+          </h3>
+          <dl className="mt-2 space-y-2 text-xs">
+            <Row label="IUPAC">
+              <span className="break-words font-mono text-[#1A1A1A]/80">
+                {compound.iupac || info?.iupac_from_pubchem || "—"}
+              </span>
+            </Row>
+            <Row label="SMILES">
+              <span className="flex items-start gap-2">
+                <span className="break-all font-mono text-[#1A1A1A]/80">
+                  {compound.smiles}
+                </span>
+                <button
+                  type="button"
+                  onClick={copySmiles}
+                  className="shrink-0 rounded-full border border-[#1A1A1A]/15 bg-white px-1.5 py-0.5 text-[9px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
+                >
+                  {copied ? "✓" : "copy"}
+                </button>
+              </span>
+            </Row>
+            <Row label="Formula">
+              {infoLoading ? (
+                <Skeleton />
+              ) : (
+                <span className="font-mono text-[#1A1A1A]/80">
+                  {info?.formula ?? "—"}
+                </span>
+              )}
+            </Row>
+            <Row label="Weight">
+              {infoLoading ? (
+                <Skeleton />
+              ) : (
+                <span className="font-mono text-[#1A1A1A]/80">
+                  {info?.weight ? `${info.weight} g/mol` : "—"}
+                </span>
+              )}
+            </Row>
+          </dl>
+        </section>
 
-      {compound.iupac && (
-        <p
-          className="mt-2 truncate font-mono text-[10px] text-[#1A1A1A]/60"
-          title={compound.iupac}
-        >
-          {compound.iupac}
-        </p>
-      )}
+        <section className="mt-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]/50">
+            Description
+          </h3>
+          <p className="mt-2 text-sm italic text-[#1A1A1A]/80">
+            {compound.one_line}
+          </p>
+        </section>
 
-      <div className="mt-1 flex items-center gap-1">
-        <p
-          className="truncate font-mono text-[10px] text-[#1A1A1A]/60"
-          title={compound.smiles}
-        >
-          {compound.smiles}
-        </p>
-        <button
-          type="button"
-          onClick={copySmiles}
-          className="shrink-0 rounded-full border border-[#1A1A1A]/15 bg-white px-1.5 py-0.5 text-[9px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A]/5"
-        >
-          {copied ? "✓" : "copy"}
-        </button>
-      </div>
+        <section className="mt-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]/50">
+            External
+          </h3>
+          {infoLoading ? (
+            <Skeleton className="mt-2 w-40" />
+          ) : pubchemUrl ? (
+            <a
+              href={pubchemUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block text-sm text-[#1A1A1A] underline decoration-[#CFFF00] decoration-2 underline-offset-4 hover:opacity-80"
+            >
+              PubChem CID {info?.cid} ↗
+            </a>
+          ) : (
+            <p className="mt-2 text-sm text-[#1A1A1A]/50">
+              Not found in PubChem
+            </p>
+          )}
+        </section>
+      </aside>
+    </div>
+  );
+}
 
-      <p className="mt-2 line-clamp-2 italic text-[11px] text-[#1A1A1A]/80">
-        {compound.one_line}
-      </p>
-    </article>
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[80px_1fr] gap-2">
+      <dt className="text-[#1A1A1A]/50">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
+  );
+}
+
+function Skeleton({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={
+        "inline-block h-3 w-24 animate-pulse rounded bg-[#1A1A1A]/10 " +
+        className
+      }
+    />
   );
 }

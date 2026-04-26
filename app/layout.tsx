@@ -13,6 +13,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
+      <head>
+        <script src="https://3Dmol.org/build/3Dmol-min.js" async />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
