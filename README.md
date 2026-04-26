@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stoich
 
-## Getting Started
+**Read chemistry papers, see the molecules.**
 
-First, run the development server:
+Stoich turns chemistry papers into interactive molecular diagrams. Paste a paragraph, upload a PDF, or highlight a sentence — and Stoich extracts every compound, draws it in 2D and 3D, classifies its role in the reaction, builds the full equation with conditions and yield, and lets you search across every paper you've read with semantic vector search.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Built for [LA Hacks 2026](https://lahacks.com).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+[Live site](https://stoich.vercel.app) · [Devpost](https://devpost.com/) · [Demo video](#)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## What it does
 
-## Learn More
+- **Extract** every compound from any chemistry paragraph using Google Gemma 3 27B
+- **Render** 2D structures via PubChem and rotatable 3D models via 3Dmol.js + Cactus
+- **Classify** each compound as reactant, product, catalyst, or solvent
+- **Build** the full reaction equation with temperature, pressure, time, and yield
+- **Decompose** multi-step syntheses into stacked equations or a force-directed graph
+- **Search** every paper you've extracted with `$vectorSearch` — type "anti-inflammatory" and find the aspirin paper from last week
+- **Narrate** any reaction aloud with ElevenLabs
+- **Customize** your workspace by swapping any pane to any slot
+- **Annotate** with highlights and notes that persist per extraction
 
-To learn more about Next.js, take a look at the following resources:
+## Tech stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Frontend**: Next.js 14 (app router), TypeScript, Tailwind CSS
+- **Reasoning**: Google Gemma 3 27B via Google AI Studio
+- **Embeddings**: OpenAI `text-embedding-3-small` (1536 dim)
+- **Database**: MongoDB Atlas with `$vectorSearch`
+- **2D structures**: PubChem REST API
+- **3D structures**: 3Dmol.js + NIH Cactus (SMILES → SDF)
+- **TTS**: ElevenLabs Turbo v2.5
+- **PDF parsing**: pdf.js (client-side)
+- **Hosting**: Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture
