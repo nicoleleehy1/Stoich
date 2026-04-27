@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import ReactionGraph from "./ReactionGraph";
+import RDKitStructure from "./RDKitStructure";
 
 export type Compound = {
   name: string;
@@ -95,7 +96,7 @@ export default function ReactionPane(props: {
         </div>
         <div className="flex items-center gap-2">
           <div
-            className="inline-flex overflow-hidden border border-[#1A1A1A] bg-[#FAF6EC] text-[10px] uppercase tracking-[0.18em]"
+            className="inline-flex overflow-hidden border border-[#1A1A1A] bg-white text-[10px] uppercase tracking-[0.18em]"
             style={SANS}
           >
             <button
@@ -104,7 +105,7 @@ export default function ReactionPane(props: {
               className={
                 "px-3 py-1.5 transition-colors " +
                 (viewMode === "equation"
-                  ? "bg-[#1A1A1A] text-[#FAF6EC]"
+                  ? "bg-[#1A1A1A] text-white"
                   : "text-[#1A1A1A] hover:bg-[#1A1A1A]/5")
               }
             >
@@ -116,7 +117,7 @@ export default function ReactionPane(props: {
               className={
                 "border-l border-[#1A1A1A] px-3 py-1.5 transition-colors " +
                 (viewMode === "graph"
-                  ? "bg-[#1A1A1A] text-[#FAF6EC]"
+                  ? "bg-[#1A1A1A] text-white"
                   : "text-[#1A1A1A] hover:bg-[#1A1A1A]/5")
               }
             >
@@ -127,7 +128,7 @@ export default function ReactionPane(props: {
             type="button"
             onClick={onNarrate}
             disabled={narrateLoading || compoundsCount === 0}
-            className="border border-[#1A1A1A] bg-[#FAF6EC] px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF6EC] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#FAF6EC] disabled:hover:text-[#1A1A1A]"
+            className="border border-[#1A1A1A] bg-white px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A1A1A]"
             aria-label="Narrate the reaction"
             style={SANS}
           >
@@ -185,7 +186,9 @@ export default function ReactionPane(props: {
           <div className="flex flex-col">
             {reactionSteps.map((step, i) => (
               <div key={step.step_number}>
-                {i > 0 && <div className="my-3 border-t border-[#1A1A1A]/20" />}
+                {i > 0 && (
+                  <div className="my-6 border-t border-[#1A1A1A]/10" />
+                )}
                 <p
                   className="mb-2 flex items-baseline gap-2 text-sm italic text-[#1A1A1A]/70"
                   style={SERIF}
@@ -204,7 +207,7 @@ export default function ReactionPane(props: {
                 />
                 {step.description && (
                   <p
-                    className="mt-2 text-xs italic text-[#1A1A1A]/60"
+                    className="mt-5 text-xs italic text-[#5C5651]"
                     style={SANS}
                   >
                     {step.description}
@@ -250,7 +253,7 @@ function StepEquation({
   return (
     <div
       className={
-        "flex items-center justify-center gap-3 px-2 " +
+        "flex items-center justify-center gap-7 px-2 " +
         (vertical ? "flex-col" : "min-w-max")
       }
     >
@@ -258,13 +261,11 @@ function StepEquation({
         <div
           key={`r-${i}`}
           className={
-            "flex items-center gap-3 " + (vertical ? "flex-col" : "")
+            "flex items-center gap-7 " + (vertical ? "flex-col" : "")
           }
         >
-          <MiniCard compound={c} onClick={() => onPickCompound(c)} />
-          {i < reactants.length - 1 && (
-            <span className="text-2xl text-[#1A1A1A]/40">+</span>
-          )}
+          <Molecule compound={c} onClick={() => onPickCompound(c)} />
+          {i < reactants.length - 1 && <PlusSymbol />}
         </div>
       ))}
       <ReactionArrow
@@ -275,26 +276,32 @@ function StepEquation({
       />
       {step.conditions.yield && (
         <span
-          className="border border-[#A8483B]/40 bg-[#A8483B]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#A8483B]"
+          className="text-xs text-[#5C5651]"
           style={SANS}
         >
-          yield · {step.conditions.yield}
+          yield: {step.conditions.yield}
         </span>
       )}
       {products.map((c, i) => (
         <div
           key={`p-${i}`}
           className={
-            "flex items-center gap-3 " + (vertical ? "flex-col" : "")
+            "flex items-center gap-7 " + (vertical ? "flex-col" : "")
           }
         >
-          <MiniCard compound={c} onClick={() => onPickCompound(c)} />
-          {i < products.length - 1 && (
-            <span className="text-2xl text-[#1A1A1A]/40">+</span>
-          )}
+          <Molecule compound={c} onClick={() => onPickCompound(c)} />
+          {i < products.length - 1 && <PlusSymbol />}
         </div>
       ))}
     </div>
+  );
+}
+
+function PlusSymbol() {
+  return (
+    <span className="text-4xl font-light leading-none text-[#5C5651]">
+      +
+    </span>
   );
 }
 
@@ -322,18 +329,18 @@ function ReactionArrow({
   return (
     <div className="flex flex-col items-center justify-center px-2">
       <div
-        className="min-h-[16px] text-center text-[10px] leading-tight text-[#A8483B]"
+        className="min-h-[16px] text-center text-xs uppercase leading-tight tracking-[0.18em] text-[#A8483B]"
         style={MONO}
       >
         {above.map((line, i) => (
           <div key={`above-${i}`}>{line}</div>
         ))}
       </div>
-      <div className="text-3xl leading-none tracking-tighter text-[#1A1A1A]">
+      <div className="text-4xl leading-none tracking-tighter text-[#1A1A1A]">
         {vertical ? "↓" : "⟶"}
       </div>
       <div
-        className="min-h-[16px] text-center text-[10px] italic leading-tight text-[#1A1A1A]/60"
+        className="min-h-[16px] text-center text-xs italic leading-tight text-[#5C5651]"
         style={SANS}
       >
         {below.map((line, i) => (
@@ -344,36 +351,33 @@ function ReactionArrow({
   );
 }
 
-function MiniCard({
+function Molecule({
   compound,
   onClick,
 }: {
   compound: Compound;
   onClick?: () => void;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
+  const fallbackUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(
+    compound.smiles
+  )}/PNG`;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-28 flex-col items-center border border-[#1A1A1A]/20 bg-[#FDFBF5] p-3 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
+      className="group flex cursor-pointer flex-col items-center bg-transparent text-left"
     >
-      {imageFailed ? (
-        <div className="flex h-20 w-full items-center justify-center bg-[#1A1A1A]/5 text-base text-[#1A1A1A]/40">
-          ?
-        </div>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={compound.image_url}
-          alt={compound.name}
-          className="h-20 max-h-20 w-full object-contain"
-          onError={() => setImageFailed(true)}
+      <div className="transition-transform duration-150 ease-out group-hover:-translate-y-0.5">
+        <RDKitStructure
+          smiles={compound.smiles}
+          fallbackUrl={fallbackUrl}
+          width={180}
+          height={180}
         />
-      )}
+      </div>
       <p
-        className="mt-2 w-full truncate text-center text-xs text-[#1A1A1A]"
+        className="mt-2 max-w-[180px] truncate border-b border-transparent text-center text-sm text-[#5C5651] transition-colors group-hover:border-[#A8483B]"
         style={SANS}
       >
         {compound.name}

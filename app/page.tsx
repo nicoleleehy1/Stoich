@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import Mol3D from "./components/Mol3D";
+import RDKitStructure from "./components/RDKitStructure";
 import InputPane, {
   type Highlight,
   type HighlightColor,
@@ -659,7 +660,7 @@ export default function Home() {
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col bg-[#FAF6EC] lg:h-screen lg:overflow-hidden">
+    <main className="relative flex min-h-screen flex-col bg-white lg:h-screen lg:overflow-hidden">
       <div aria-hidden className="paper-lines pointer-events-none fixed inset-0 z-0" />
       <div aria-hidden className="paper-grain pointer-events-none fixed inset-0 z-0" />
 
@@ -760,8 +761,8 @@ function PaneShell({
   }, [menuOpen]);
 
   return (
-    <div className="flex h-full flex-col bg-[#FAF6EC]">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#1A1A1A]/25 bg-[#FAF6EC]/60 px-3 backdrop-blur-[1px]">
+    <div className="flex h-full flex-col bg-white">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#1A1A1A]/25 bg-white/60 px-3 backdrop-blur-[1px]">
         <h3
           className="flex items-baseline gap-2 text-[13px] tracking-tight text-[#1A1A1A]"
           style={SERIF}
@@ -780,12 +781,12 @@ function PaneShell({
             onClick={() => setMenuOpen((o) => !o)}
             title={`Swap ${PANE_TITLES[assignment]}`}
             aria-label={`Swap pane ${slot}`}
-            className="flex h-6 w-6 items-center justify-center text-[#1A1A1A]/60 transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+            className="flex h-6 w-6 items-center justify-center text-[#1A1A1A]/60 transition-colors hover:bg-[#1A1A1A] hover:text-white"
           >
             ⇄
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden border border-[#1A1A1A]/40 bg-[#FAF6EC]">
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] overflow-hidden border border-[#1A1A1A]/40 bg-white">
               {(["input", "reaction", "compounds"] as PaneType[]).map((t) => (
                 <button
                   key={t}
@@ -798,7 +799,7 @@ function PaneShell({
                     "block w-full px-3 py-1.5 text-left text-xs transition-colors " +
                     (t === assignment
                       ? "bg-[#A8483B]/15 text-[#1A1A1A]"
-                      : "text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#FAF6EC]")
+                      : "text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white")
                   }
                   style={SANS}
                 >
@@ -825,8 +826,11 @@ function CompoundDrawer({
 }) {
   const [info, setInfo] = useState<CompoundInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(true);
-  const [imageFailed, setImageFailed] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const fallbackUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(
+    compound.smiles
+  )}/PNG`;
 
   const isProduct = compound.role?.toLowerCase() === "product";
 
@@ -905,20 +909,13 @@ function CompoundDrawer({
           </p>
         </div>
 
-        <div className="mt-4 flex justify-center border border-[#1A1A1A]/15 bg-white">
-          {imageFailed ? (
-            <div className="flex h-48 w-full items-center justify-center bg-[#1A1A1A]/5 text-sm text-[#1A1A1A]/50">
-              structure not in PubChem
-            </div>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={compound.image_url}
-              alt={compound.name}
-              className="max-h-72 w-full bg-white object-contain"
-              onError={() => setImageFailed(true)}
-            />
-          )}
+        <div className="mt-4 flex justify-center border border-[#1A1A1A]/15 bg-transparent p-2">
+          <RDKitStructure
+            smiles={compound.smiles}
+            fallbackUrl={fallbackUrl}
+            width={280}
+            height={280}
+          />
         </div>
 
         <h2

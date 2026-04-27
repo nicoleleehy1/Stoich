@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import RDKitStructure from "./RDKitStructure";
 
 export type Compound = {
   name: string;
@@ -103,10 +104,13 @@ function CompoundCard({
   compound: Compound;
   onOpen: () => void;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const isProduct = compound.role?.toLowerCase() === "product";
+
+  const fallbackUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(
+    compound.smiles
+  )}/PNG`;
 
   async function copySmiles(e: React.MouseEvent) {
     e.stopPropagation();
@@ -122,9 +126,9 @@ function CompoundCard({
   return (
     <article
       onClick={onOpen}
-      className="group flex w-full cursor-pointer flex-col border border-[#1A1A1A]/20 bg-[#FDFBF5] p-3 transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
+      className="group flex w-full cursor-pointer flex-col rounded-[4px] border border-[#1A1A1A]/[0.10] bg-white p-3 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-[#1A1A1A]/[0.25]"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-baseline justify-between gap-2">
         <h3
           className="truncate text-sm font-bold text-[#1A1A1A]"
           title={compound.name}
@@ -134,10 +138,10 @@ function CompoundCard({
         </h3>
         <span
           className={
-            "shrink-0 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.18em] " +
+            "shrink-0 text-[10px] uppercase tracking-[0.18em] " +
             (isProduct
-              ? "bg-[#A8483B] text-[#FAF6EC]"
-              : "border border-[#1A1A1A]/30 bg-[#FAF6EC] text-[#1A1A1A]/70")
+              ? "font-bold text-[#A8483B]"
+              : "text-[#5C5651]")
           }
           style={SANS}
         >
@@ -145,28 +149,18 @@ function CompoundCard({
         </span>
       </div>
 
-      <div className="mt-2 flex justify-center bg-white">
-        {imageFailed ? (
-          <div
-            className="flex h-24 w-full items-center justify-center bg-[#1A1A1A]/5 text-xs italic text-[#1A1A1A]/50"
-            style={SANS}
-          >
-            not in PubChem
-          </div>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={compound.image_url}
-            alt={compound.name}
-            className="max-h-24 w-full bg-white object-contain"
-            onError={() => setImageFailed(true)}
-          />
-        )}
+      <div className="mt-2 flex justify-center">
+        <RDKitStructure
+          smiles={compound.smiles}
+          fallbackUrl={fallbackUrl}
+          width={180}
+          height={180}
+        />
       </div>
 
       {compound.iupac && (
         <p
-          className="mt-2 truncate text-[10px] text-[#1A1A1A]/60"
+          className="mt-2 truncate text-xs text-[#5C5651]"
           title={compound.iupac}
           style={MONO}
         >
@@ -174,9 +168,9 @@ function CompoundCard({
         </p>
       )}
 
-      <div className="mt-1 flex items-center gap-1">
+      <div className="mt-1 flex items-center gap-2">
         <p
-          className="truncate text-[10px] text-[#1A1A1A]/60"
+          className="truncate text-xs text-[#5C5651]"
           title={compound.smiles}
           style={MONO}
         >
@@ -185,7 +179,7 @@ function CompoundCard({
         <button
           type="button"
           onClick={copySmiles}
-          className="shrink-0 border border-[#1A1A1A]/30 bg-[#FAF6EC] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+          className="shrink-0 text-xs text-[#5C5651] transition-colors hover:text-[#A8483B]"
           style={SANS}
         >
           {copied ? "✓" : "copy"}
@@ -193,7 +187,7 @@ function CompoundCard({
       </div>
 
       <p
-        className="mt-2 line-clamp-2 text-[11px] italic text-[#1A1A1A]/80"
+        className="mt-2 line-clamp-2 text-xs italic text-[#5C5651]"
         style={SANS}
       >
         {compound.one_line}

@@ -31,7 +31,7 @@ export default function TopNav() {
 
   return (
     <>
-      <nav className="relative z-30 flex h-12 shrink-0 items-center justify-between border-b border-[#1A1A1A]/40 bg-[#FAF6EC] px-4 sm:px-6">
+      <nav className="relative z-30 flex h-12 shrink-0 items-center justify-between border-b border-[#1A1A1A]/40 bg-white px-4 sm:px-6">
         <Link
           href="/landing"
           className="group inline-flex items-baseline gap-0 text-[20px] tracking-tight"
@@ -116,13 +116,13 @@ function DocsModal({ onClose }: { onClose: () => void }) {
       aria-label="How Stoich works"
     >
       <div
-        className="docs-card relative my-8 w-full max-w-[720px] border border-[#1A1A1A]/40 bg-[#FAF6EC] p-6 sm:p-10"
+        className="docs-card relative my-8 w-full max-w-[720px] border border-[#1A1A1A]/40 bg-white p-6 sm:p-10"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center border border-[#1A1A1A]/40 bg-[#FAF6EC] text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center border border-[#1A1A1A]/40 bg-white text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-white"
           aria-label="Close docs"
         >
           ✕
@@ -337,7 +337,7 @@ const docsStyles = `
   .docs-examples { display: flex; flex-direction: column; gap: 18px; }
   .docs-examples > li {
     border: 1px solid rgba(26,26,26,0.18);
-    background: #FDFBF5;
+    background: #FFFFFF;
     padding: 12px 14px;
   }
   .docs-copy {
@@ -347,11 +347,11 @@ const docsStyles = `
     border: 1px solid #1A1A1A;
     padding: 4px 10px;
     color: #1A1A1A;
-    background: #FAF6EC;
+    background: #FFFFFF;
     transition: background-color .2s, color .2s;
     flex-shrink: 0;
   }
-  .docs-copy:hover { background: #1A1A1A; color: #FAF6EC; }
+  .docs-copy:hover { background: #1A1A1A; color: #FFFFFF; }
 
   @media (prefers-reduced-motion: reduce) {
     .docs-backdrop, .docs-card { animation: none; }

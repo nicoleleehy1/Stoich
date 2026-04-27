@@ -6,7 +6,7 @@ Stoich turns chemistry papers into interactive molecular diagrams. Paste a parag
 
 Built for [LA Hacks 2026](https://lahacks.com).
 
-[Live site](https://stoich.vercel.app) · [Devpost](https://devpost.com/) · [Demo video](#)
+[Live site](https://stoich.vercel.app/landing) · [Devpost](https://devpost.com/) · [Demo video](#)
 
 ---
 

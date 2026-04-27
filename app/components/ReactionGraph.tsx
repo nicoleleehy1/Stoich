@@ -196,7 +196,7 @@ export default function ReactionGraph({
       .append("circle")
       .attr("r", 12)
       .attr("fill", "#1A1A1A")
-      .attr("stroke", "#FAF7F2")
+      .attr("stroke", "#FFFFFF")
       .attr("stroke-width", 2);
     reactionGroup
       .append("text")
@@ -205,7 +205,7 @@ export default function ReactionGraph({
       .attr("dy", "0.32em")
       .attr("font-size", 10)
       .attr("font-weight", 700)
-      .attr("fill", "#FAF7F2")
+      .attr("fill", "#FFFFFF")
       .attr("pointer-events", "none");
 
     // Compound nodes: white circle with role-color border + label below

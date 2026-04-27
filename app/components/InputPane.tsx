@@ -209,7 +209,7 @@ export default function InputPane(props: {
   return (
     <div className="flex h-full overflow-hidden">
       {sidebarOpen && (
-        <aside className="flex w-[240px] shrink-0 flex-col border-r border-[#1A1A1A]/25 bg-[#FAF6EC]/60">
+        <aside className="flex w-[240px] shrink-0 flex-col border-r border-[#1A1A1A]/25 bg-white/60">
           <div className="border-b border-[#1A1A1A]/25 p-3">
             <h2
               className="flex items-baseline gap-2 text-[15px] tracking-tight"
@@ -228,7 +228,7 @@ export default function InputPane(props: {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="search..."
-              className="mt-2 w-full border border-[#1A1A1A]/30 bg-[#FAF6EC] px-3 py-1.5 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
+              className="mt-2 w-full border border-[#1A1A1A]/30 bg-white px-3 py-1.5 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
               style={SANS}
             />
           </div>
@@ -315,10 +315,10 @@ export default function InputPane(props: {
           className={
             "mb-3 cursor-pointer border border-dashed p-4 text-center text-sm transition-colors " +
             (pdfLoading
-              ? "cursor-wait border-[#1A1A1A]/30 bg-[#FAF6EC] text-[#1A1A1A]/50"
+              ? "cursor-wait border-[#1A1A1A]/30 bg-white text-[#1A1A1A]/50"
               : dragOver
                 ? "border-[#A8483B] bg-[#A8483B]/8 text-[#1A1A1A]"
-                : "border-[#1A1A1A]/30 bg-[#FAF6EC] text-[#2a2620] hover:bg-[#1A1A1A]/[0.03]")
+                : "border-[#1A1A1A]/30 bg-white text-[#2a2620] hover:bg-[#1A1A1A]/[0.03]")
           }
           style={SANS}
         >
@@ -358,7 +358,7 @@ export default function InputPane(props: {
             <button
               type="button"
               onClick={onClear}
-              className="shrink-0 border border-[#1A1A1A]/30 bg-[#FAF6EC] px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+              className="shrink-0 border border-[#1A1A1A]/30 bg-white px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-white"
               title="Clear"
             >
               ✕
@@ -465,7 +465,7 @@ export default function InputPane(props: {
 const paneStyles = `
   .lab-pill {
     border: 1px solid #1A1A1A;
-    background: #FAF6EC;
+    background: #FFFFFF;
     color: #1A1A1A;
     padding: 8px 16px;
     font-size: 11px;
@@ -475,21 +475,21 @@ const paneStyles = `
   }
   .lab-pill:hover {
     background: #1A1A1A;
-    color: #FAF6EC;
+    color: #FFFFFF;
   }
   .extract-btn {
     border: 1px solid #1A1A1A;
     background: #1A1A1A;
-    color: #FAF6EC;
+    color: #FFFFFF;
     padding: 11px 22px;
     font-size: 12px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     transition: background-color .2s, color .2s, opacity .2s;
   }
-  .extract-btn:hover { background: #FAF6EC; color: #1A1A1A; }
+  .extract-btn:hover { background: #FFFFFF; color: #1A1A1A; }
   .extract-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .extract-btn:disabled:hover { background: #1A1A1A; color: #FAF6EC; }
+  .extract-btn:disabled:hover { background: #1A1A1A; color: #FFFFFF; }
 `;
 
 function HighlightedTextarea({
@@ -533,7 +533,7 @@ function HighlightedTextarea({
 
   return (
     <div className="relative w-full flex-1">
-      <div className="relative h-full min-h-[200px] w-full overflow-hidden border border-[#1A1A1A]/30 bg-[#FDFBF5] focus-within:border-[#1A1A1A]">
+      <div className="relative h-full min-h-[200px] w-full overflow-hidden border border-[#1A1A1A]/30 bg-white focus-within:border-[#1A1A1A]">
         <div
           data-mirror
           aria-hidden="true"
@@ -560,7 +560,7 @@ function HighlightedTextarea({
 
         {hasSelection && !notePopoverOpen && (
           <div
-            className="absolute right-3 top-3 z-10 flex items-center gap-1 border border-[#1A1A1A]/30 bg-[#FAF6EC] p-1 shadow-md"
+            className="absolute right-3 top-3 z-10 flex items-center gap-1 border border-[#1A1A1A]/30 bg-white p-1 shadow-md"
             onMouseDown={(e) => e.preventDefault()}
           >
             {COLOR_ORDER.map((c) => (
@@ -583,7 +583,7 @@ function HighlightedTextarea({
                 e.preventDefault();
                 onOpenNote();
               }}
-              className="border border-[#1A1A1A]/30 bg-[#FAF6EC] px-2 py-0.5 text-xs text-[#1A1A1A]/80 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+              className="border border-[#1A1A1A]/30 bg-white px-2 py-0.5 text-xs text-[#1A1A1A]/80 hover:bg-[#1A1A1A] hover:text-white"
               title="Add note"
               style={SANS}
             >
@@ -594,7 +594,7 @@ function HighlightedTextarea({
 
         {notePopoverOpen && (
           <div
-            className="absolute right-3 top-3 z-10 w-72 border border-[#1A1A1A]/30 bg-[#FAF6EC] p-3 shadow-lg"
+            className="absolute right-3 top-3 z-10 w-72 border border-[#1A1A1A]/30 bg-white p-3 shadow-lg"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <p
@@ -608,7 +608,7 @@ function HighlightedTextarea({
               onChange={(e) => setNoteDraft(e.target.value)}
               placeholder="what's interesting about this?"
               autoFocus
-              className="h-20 w-full resize-none border border-[#1A1A1A]/30 bg-[#FDFBF5] p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
+              className="h-20 w-full resize-none border border-[#1A1A1A]/30 bg-white p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
               style={SANS}
             />
             <p
@@ -632,7 +632,7 @@ function HighlightedTextarea({
               <button
                 type="button"
                 onClick={onCloseNote}
-                className="ml-auto border border-[#1A1A1A]/30 bg-[#FAF6EC] px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+                className="ml-auto border border-[#1A1A1A]/30 bg-white px-2 py-0.5 text-[10px] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-white"
                 style={SANS}
               >
                 cancel
@@ -792,7 +792,7 @@ function HighlightItem({
       : highlight.text;
 
   return (
-    <li className="group relative border border-[#1A1A1A]/20 bg-[#FDFBF5] p-2.5">
+    <li className="group relative border border-[#1A1A1A]/20 bg-white p-2.5">
       <div className="flex items-start gap-2">
         <span
           className="mt-1 inline-block h-3 w-3 shrink-0 rounded-full border border-black/10"
@@ -822,14 +822,14 @@ function HighlightItem({
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="add a note..."
                 autoFocus
-                className="h-16 w-full resize-none border border-[#1A1A1A]/30 bg-[#FAF6EC] p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
+                className="h-16 w-full resize-none border border-[#1A1A1A]/30 bg-white p-2 text-xs text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#1A1A1A] focus:outline-none"
                 style={SANS}
               />
               <div className="mt-1 flex gap-1">
                 <button
                   type="button"
                   onClick={save}
-                  className="border border-[#1A1A1A] bg-[#1A1A1A] px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#FAF6EC] hover:bg-[#FAF6EC] hover:text-[#1A1A1A]"
+                  className="border border-[#1A1A1A] bg-[#1A1A1A] px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-white hover:bg-white hover:text-[#1A1A1A]"
                   style={SANS}
                 >
                   save
@@ -837,7 +837,7 @@ function HighlightItem({
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="border border-[#1A1A1A]/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-[#FAF6EC]"
+                  className="border border-[#1A1A1A]/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[#1A1A1A]/70 hover:bg-[#1A1A1A] hover:text-white"
                   style={SANS}
                 >
                   cancel
@@ -904,7 +904,7 @@ function HistoryList({
           <button
             type="button"
             onClick={() => onPick(it.id)}
-            className="w-full border border-[#1A1A1A]/20 bg-[#FDFBF5] p-2 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
+            className="w-full border border-[#1A1A1A]/20 bg-white p-2 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
           >
             <p
               className="truncate text-xs font-bold text-[#1A1A1A]"
@@ -962,7 +962,7 @@ function SearchList({
           <button
             type="button"
             onClick={() => onPick(r.extraction_id)}
-            className="w-full border border-[#1A1A1A]/20 bg-[#FDFBF5] p-2 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
+            className="w-full border border-[#1A1A1A]/20 bg-white p-2 text-left transition-colors hover:border-[#A8483B] hover:bg-[#A8483B]/5"
           >
             <div className="flex items-center justify-between gap-2">
               <p
