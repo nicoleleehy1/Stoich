@@ -31,8 +31,13 @@ CURVED-ARROW NOTATION
 - Each arrow has a SOURCE (where the electrons come from) and a TARGET (where they end up).
 - SOURCE kinds:
   * "lone-pair"  — a non-bonding electron pair on an atom
+                    Required: "atom_index"
   * "bond"       — a sigma bond between two atoms (within ONE molecule)
+                    Required: "atom_index" (the primary atom of the bond)
+                    Optional: "atom_b_index" (the other atom of the bond — provide it when the partner is ambiguous; omit when the bond is obvious from the molecule's structure, e.g. an O-H bond on a hydroxyl)
   * "pi-bond"    — a pi bond between two atoms (component of a double/triple bond)
+                    Required: "atom_index" (the primary atom — typically the more electron-poor end, e.g. the carbonyl C of a C=O)
+                    Optional: "atom_b_index" (the other atom of the pi bond — omit when unambiguous)
 - TARGET kinds:
   * "atom"           — electrons localize onto a single atom (e.g. a positively charged atom receiving a nucleophile)
   * "bond-formation" — electrons form a new bond between two atoms WITHIN the same molecule
@@ -118,7 +123,7 @@ A reasonable output:
     },
     {
       "sub_step": 2,
-      "caption": "Methanol oxygen attacks the activated carbonyl carbon",
+      "caption": "Methanol oxygen attacks the activated carbonyl carbon and the C=O pi bond breaks onto oxygen (concerted)",
       "arrows": [
         {
           "electron_count": 2,
@@ -126,6 +131,26 @@ A reasonable output:
           "target": { "kind": "between-atoms", "molecule_a_smiles": "CO", "atom_a_index": 1, "molecule_b_smiles": "CC(=O)O", "atom_b_index": 1 },
           "curve_direction": "clockwise",
           "description": "Methanol O lone pair attacks carbonyl C of protonated acetic acid"
+        },
+        {
+          "electron_count": 2,
+          "source": { "kind": "pi-bond", "molecule_smiles": "CC(=O)O", "atom_index": 1 },
+          "target": { "kind": "atom", "molecule_smiles": "CC(=O)O", "atom_index": 2 },
+          "curve_direction": "clockwise",
+          "description": "C=O pi bond electrons localize on the carbonyl oxygen (atom_b_index omitted — the C=O partner is unambiguous)"
+        }
+      ]
+    },
+    {
+      "sub_step": 3,
+      "caption": "Deprotonation of the new oxocarbenium-style OH (illustrative bond source with atom_b_index given explicitly)",
+      "arrows": [
+        {
+          "electron_count": 2,
+          "source": { "kind": "bond", "molecule_smiles": "CC(=O)O", "atom_index": 3, "atom_b_index": 1 },
+          "target": { "kind": "atom", "molecule_smiles": "CC(=O)O", "atom_index": 3 },
+          "curve_direction": "counterclockwise",
+          "description": "Sigma bond between O (atom 3) and C (atom 1) collapses; both atoms now identified by atom_index + atom_b_index"
         }
       ]
     }
@@ -568,39 +593,202 @@ function stripFences(s: string): string {
   return out.trim();
 }
 
-function isValidArrow(
+type RefCheck = { ok: true } | { ok: false; reason: string };
+
+// Defensive: Claude can emit malformed shapes (missing molecule_smiles,
+// wrong field names, atom_index instead of atom_a_index/atom_b_index when
+// the kind expects two atoms). Treat any non-string smiles or non-integer
+// atom_index as a clean validation failure with a logged reason — never
+// crash. The parameters are typed `unknown` so TypeScript forces every
+// dereference behind a runtime type check.
+function checkRef(
+  smiles: unknown,
+  atomIndex: unknown,
+  side: "source" | "target",
+  validSet: Set<string>,
+  atomCounts: Map<string, number>
+): RefCheck {
+  if (typeof smiles !== "string") {
+    return {
+      ok: false,
+      reason: `${side} molecule_smiles is missing or not a string (got ${JSON.stringify(smiles)})`,
+    };
+  }
+
+  if (!validSet.has(smiles)) {
+    // Detect placeholder-style SMILES (Claude sometimes invents names like
+    // "tetrahedral_intermediate_smiles" when the mechanism passes through
+    // an intermediate that wasn't provided as an input compound).
+    const looksLikePlaceholder =
+      /_/.test(smiles) ||
+      /^<.*>$/.test(smiles) ||
+      smiles.toLowerCase().includes("intermediate") ||
+      smiles.toLowerCase().includes("transition");
+
+    // See if a whitespace/case-normalized match would have succeeded — if
+    // it would, that means the validator's strict equality is the reason
+    // for the strip, not actual hallucination.
+    const trimmed = smiles.trim();
+    const normMatch = Array.from(validSet).find((v) => {
+      if (v.trim() === trimmed) return true;
+      if (v.trim().toLowerCase() === trimmed.toLowerCase()) return true;
+      return false;
+    });
+
+    if (looksLikePlaceholder) {
+      return {
+        ok: false,
+        reason: `${side} references unknown intermediate (e.g., '${smiles}')`,
+      };
+    }
+
+    const inputList = Array.from(validSet).join(", ");
+    if (normMatch) {
+      return {
+        ok: false,
+        reason: `${side} molecule_smiles '${smiles}' did not match exactly; a whitespace/case-normalized match against '${normMatch}' WOULD have succeeded (input compounds: [${inputList}])`,
+      };
+    }
+
+    return {
+      ok: false,
+      reason: `${side} molecule_smiles '${smiles}' not in input compounds (input compounds: [${inputList}])`,
+    };
+  }
+
+  if (typeof atomIndex !== "number" || !Number.isInteger(atomIndex)) {
+    return {
+      ok: false,
+      reason: `${side} atom_index is missing or not an integer (got ${JSON.stringify(atomIndex)}) for molecule '${smiles}'`,
+    };
+  }
+
+  const count = atomCounts.get(smiles) ?? 0;
+  if (atomIndex < 0 || atomIndex >= count) {
+    return {
+      ok: false,
+      reason: `${side} atom_index ${atomIndex} out of bounds for molecule '${smiles}' (has ${count} atoms)`,
+    };
+  }
+
+  return { ok: true };
+}
+
+function validateArrow(
   arrow: Arrow,
   validSet: Set<string>,
   atomCounts: Map<string, number>
-): boolean {
-  function refOk(smiles: string, atomIndex: number): boolean {
-    if (!validSet.has(smiles)) return false;
-    const count = atomCounts.get(smiles) ?? 0;
-    return Number.isInteger(atomIndex) && atomIndex >= 0 && atomIndex < count;
+): RefCheck {
+  if (!arrow || typeof arrow !== "object") {
+    return { ok: false, reason: "arrow is missing or not an object" };
   }
 
-  const src: ArrowSource = arrow.source;
+  const src = arrow.source as ArrowSource | undefined;
+  if (!src || typeof src !== "object") {
+    return { ok: false, reason: "arrow has no source object" };
+  }
+
   if (src.kind === "lone-pair") {
-    if (!refOk(src.molecule_smiles, src.atom_index)) return false;
+    const r = checkRef(
+      src.molecule_smiles,
+      src.atom_index,
+      "source",
+      validSet,
+      atomCounts
+    );
+    if (!r.ok) return r;
+  } else if (src.kind === "bond" || src.kind === "pi-bond") {
+    // New shape: atom_index required, atom_b_index optional. The Phase 4
+    // renderer will infer the bond endpoint from the molecule's bond graph
+    // when atom_b_index is omitted.
+    const r = checkRef(
+      src.molecule_smiles,
+      src.atom_index,
+      "source",
+      validSet,
+      atomCounts
+    );
+    if (!r.ok) return r;
+    if (src.atom_b_index !== undefined) {
+      const r2 = checkRef(
+        src.molecule_smiles,
+        src.atom_b_index,
+        "source",
+        validSet,
+        atomCounts
+      );
+      if (!r2.ok) return r2;
+    }
   } else {
-    if (!refOk(src.molecule_smiles, src.atom_a_index)) return false;
-    if (!refOk(src.molecule_smiles, src.atom_b_index)) return false;
+    return {
+      ok: false,
+      reason: `unknown source kind '${(src as { kind?: unknown }).kind}'`,
+    };
   }
 
-  const tgt: ArrowTarget = arrow.target;
+  const tgt = arrow.target as ArrowTarget | undefined;
+  if (!tgt || typeof tgt !== "object") {
+    return { ok: false, reason: "arrow has no target object" };
+  }
+
   if (tgt.kind === "atom") {
-    if (!refOk(tgt.molecule_smiles, tgt.atom_index)) return false;
+    const r = checkRef(
+      tgt.molecule_smiles,
+      tgt.atom_index,
+      "target",
+      validSet,
+      atomCounts
+    );
+    if (!r.ok) return r;
   } else if (tgt.kind === "bond-formation") {
-    if (!refOk(tgt.molecule_smiles, tgt.atom_a_index)) return false;
-    if (!refOk(tgt.molecule_smiles, tgt.atom_b_index)) return false;
+    const r1 = checkRef(
+      tgt.molecule_smiles,
+      tgt.atom_a_index,
+      "target",
+      validSet,
+      atomCounts
+    );
+    if (!r1.ok) return r1;
+    const r2 = checkRef(
+      tgt.molecule_smiles,
+      tgt.atom_b_index,
+      "target",
+      validSet,
+      atomCounts
+    );
+    if (!r2.ok) return r2;
+  } else if (tgt.kind === "between-atoms") {
+    const r1 = checkRef(
+      tgt.molecule_a_smiles,
+      tgt.atom_a_index,
+      "target",
+      validSet,
+      atomCounts
+    );
+    if (!r1.ok) return r1;
+    const r2 = checkRef(
+      tgt.molecule_b_smiles,
+      tgt.atom_b_index,
+      "target",
+      validSet,
+      atomCounts
+    );
+    if (!r2.ok) return r2;
   } else {
-    if (!refOk(tgt.molecule_a_smiles, tgt.atom_a_index)) return false;
-    if (!refOk(tgt.molecule_b_smiles, tgt.atom_b_index)) return false;
+    return {
+      ok: false,
+      reason: `unknown target kind '${(tgt as { kind?: unknown }).kind}'`,
+    };
   }
 
-  if (arrow.electron_count !== 1 && arrow.electron_count !== 2) return false;
+  if (arrow.electron_count !== 1 && arrow.electron_count !== 2) {
+    return {
+      ok: false,
+      reason: `electron_count must be 1 or 2 (got ${JSON.stringify(arrow.electron_count)})`,
+    };
+  }
 
-  return true;
+  return { ok: true };
 }
 
 function validateMechanism(
@@ -621,10 +809,16 @@ function validateMechanism(
     const validArrows: Arrow[] = [];
     for (const arrow of sub.arrows ?? []) {
       rawArrowCount += 1;
-      if (isValidArrow(arrow, validSet, atomCounts)) {
+      const result = validateArrow(arrow, validSet, atomCounts);
+      if (result.ok) {
         validArrows.push(arrow);
       } else {
         unverified += 1;
+        console.log(
+          `[mechanism] arrow stripped: ${result.reason}`,
+          "arrow:",
+          JSON.stringify(arrow)
+        );
       }
     }
     if (validArrows.length > 0) {
@@ -722,6 +916,11 @@ export async function generateMechanism(
     );
     return null;
   }
+
+  console.log(
+    "[mechanism] PRE-VALIDATION:",
+    JSON.stringify(parsed, null, 2)
+  );
 
   const { mechanism, rawArrowCount } = validateMechanism(
     parsed,

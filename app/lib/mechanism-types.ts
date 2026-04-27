@@ -7,14 +7,14 @@ export type ArrowSource =
   | {
       kind: "bond";
       molecule_smiles: string;
-      atom_a_index: number;
-      atom_b_index: number;
+      atom_index: number;
+      atom_b_index?: number;
     }
   | {
       kind: "pi-bond";
       molecule_smiles: string;
-      atom_a_index: number;
-      atom_b_index: number;
+      atom_index: number;
+      atom_b_index?: number;
     };
 
 export type ArrowTarget =
