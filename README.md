@@ -13,7 +13,7 @@ Built for [LA Hacks 2026](https://lahacks.com).
 ## What it does
 
 - **Extract** every compound from any chemistry paragraph using Google Gemma 3 27B
-- **Render** 2D structures via PubChem and rotatable 3D models via 3Dmol.js + Cactus
+- **Render** 2D structures via RDKit-JS (with PubChem fallback) and rotatable 3D models via 3Dmol.js + Cactus
 - **Classify** each compound as reactant, product, catalyst, or solvent
 - **Build** the full reaction equation with temperature, pressure, time, and yield
 - **Decompose** multi-step syntheses into stacked equations or a force-directed graph
@@ -28,7 +28,7 @@ Built for [LA Hacks 2026](https://lahacks.com).
 - **Reasoning**: Google Gemma 3 27B via Google AI Studio
 - **Embeddings**: OpenAI `text-embedding-3-small` (1536 dim)
 - **Database**: MongoDB Atlas with `$vectorSearch`
-- **2D structures**: PubChem REST API
+- **2D structures**: RDKit-JS (WebAssembly molecular rendering) with PubChem REST API as fallback
 - **3D structures**: 3Dmol.js + NIH Cactus (SMILES → SDF)
 - **TTS**: ElevenLabs Turbo v2.5
 - **PDF parsing**: pdf.js (client-side)
