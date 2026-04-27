@@ -3,11 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 import { getRDKit, type RDKitMol } from "../lib/rdkit";
 
+export type AtomData = {
+  index: number;
+  x: number;
+  y: number;
+  element: string;
+};
+
+export type AtomMap = {
+  atoms: AtomData[];
+  svgWidth: number;
+  svgHeight: number;
+  smiles: string;
+};
+
 type Props = {
   smiles: string;
   width?: number;
   height?: number;
   fallbackUrl?: string;
+  onAtomMap?: (atomMap: AtomMap) => void;
 };
 
 type Status =
@@ -23,9 +38,18 @@ export default function RDKitStructure({
   width = 200,
   height = 200,
   fallbackUrl,
+  onAtomMap,
 }: Props) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const svgHostRef = useRef<HTMLDivElement | null>(null);
+
+  // Hold the latest onAtomMap in a ref so the cleanup effect doesn't have to
+  // include it in deps and re-run on every parent render. The callback only
+  // needs to fire when a fresh SVG is inserted.
+  const onAtomMapRef = useRef(onAtomMap);
+  useEffect(() => {
+    onAtomMapRef.current = onAtomMap;
+  }, [onAtomMap]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +143,8 @@ export default function RDKitStructure({
   //   4. inline background style on the <svg> root
   //   5. expand the viewBox by ~8% on each side so edge atom labels (HO, OH)
   //      have breathing room and don't clip
+  // Then, if a caller asked for an atom map, walk the rendered atoms and
+  // extract their (index, x, y, element) tuples in viewBox coordinates.
   useEffect(() => {
     if (status.kind !== "ok") return;
     const host = svgHostRef.current;
@@ -185,7 +211,14 @@ export default function RDKitStructure({
         );
       }
     }
-  }, [status]);
+
+    // Atom-map extraction. Skip the work entirely if no caller is listening.
+    const callback = onAtomMapRef.current;
+    if (callback) {
+      const atomMap = extractAtomMap(svgEl, smiles);
+      if (atomMap) callback(atomMap);
+    }
+  }, [status, smiles]);
 
   const wrapperStyle: React.CSSProperties = {
     width,
@@ -205,9 +238,7 @@ export default function RDKitStructure({
       <ProgressBar loading={status.kind === "loading"} />
 
       {status.kind === "loading" && (
-        <span
-          className="flex h-full w-full items-center justify-center text-[10px] italic text-[#1A1A1A]/50"
-        >
+        <span className="flex h-full w-full items-center justify-center text-[10px] italic text-[#1A1A1A]/50">
           Drawing structure...
         </span>
       )}
@@ -250,4 +281,99 @@ function ProgressBar({ loading }: { loading: boolean }) {
       <div className="h-full w-full animate-pulse bg-[#A8483B]" />
     </div>
   );
+}
+
+// RDKit emits each atom with a class like "atom-3". Heteroatoms render as
+// <text> with the element symbol; carbons are implicit and may render as
+// <path> bond endpoints, <circle> markers, or be omitted from the DOM
+// altogether — versions vary. We collect every variant we can find, dedupe by
+// atom index, and prefer the source with the most reliable position data:
+// text > path > circle. Coordinates are in the SVG's viewBox space, which is
+// the same coordinate system any future arrow overlay will use.
+function extractAtomMap(svgEl: SVGSVGElement, smiles: string): AtomMap | null {
+  const atomElements = svgEl.querySelectorAll<SVGGraphicsElement>(
+    '[class*="atom-"]'
+  );
+
+  type Candidate = AtomData & { priority: number };
+  const byIndex = new Map<number, Candidate>();
+
+  atomElements.forEach((el) => {
+    const className = el.getAttribute("class") || "";
+    // Skip bond paths. RDKit annotates each bond with its endpoint atom
+    // indices (class="bond-1 atom-3 atom-4"), but the bond's centroid is the
+    // midpoint of the bond, not the atom position — so attributing it to an
+    // atom would be wrong.
+    if (/\bbond-\d+/.test(className)) return;
+
+    const match = className.match(/atom-(\d+)/);
+    if (!match) return;
+    const index = parseInt(match[1], 10);
+    if (!Number.isFinite(index)) return;
+
+    const tag = el.tagName.toLowerCase();
+    let x: number;
+    let y: number;
+    let element: string;
+    let priority: number;
+
+    try {
+      if (tag === "text") {
+        const bbox = el.getBBox();
+        x = bbox.x + bbox.width / 2;
+        y = bbox.y + bbox.height / 2;
+        // Strip any subscript/superscript children — for "OH" we want "OH",
+        // for "NH2" we want "NH2", but if RDKit nested the digit in a tspan
+        // textContent still concatenates correctly.
+        const text = (el.textContent || "").trim();
+        element = text || "C";
+        priority = 3;
+      } else if (tag === "circle") {
+        x = parseFloat(el.getAttribute("cx") || "0");
+        y = parseFloat(el.getAttribute("cy") || "0");
+        element = "C";
+        priority = 1;
+      } else if (tag === "path") {
+        const bbox = el.getBBox();
+        x = bbox.x + bbox.width / 2;
+        y = bbox.y + bbox.height / 2;
+        element = "C";
+        priority = 2;
+      } else {
+        const bbox = el.getBBox();
+        x = bbox.x + bbox.width / 2;
+        y = bbox.y + bbox.height / 2;
+        element = "C";
+        priority = 0;
+      }
+    } catch {
+      return;
+    }
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const existing = byIndex.get(index);
+    if (!existing || priority > existing.priority) {
+      byIndex.set(index, { index, x, y, element, priority });
+    }
+  });
+
+  const atoms: AtomData[] = Array.from(byIndex.values())
+    .map(({ index, x, y, element }) => ({ index, x, y, element }))
+    .sort((a, b) => a.index - b.index);
+
+  // Use the SVG's CURRENT viewBox (after our 8% expansion) so atom coords and
+  // svgWidth/svgHeight share a consistent coordinate system.
+  const finalVB = svgEl.getAttribute("viewBox");
+  let svgWidth = 0;
+  let svgHeight = 0;
+  if (finalVB) {
+    const parts = finalVB.split(/\s+/).map(Number);
+    if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+      svgWidth = parts[2];
+      svgHeight = parts[3];
+    }
+  }
+
+  return { atoms, svgWidth, svgHeight, smiles };
 }
