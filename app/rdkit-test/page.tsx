@@ -13,21 +13,38 @@ const SAMPLES: { label: string; smiles: string }[] = [
 ];
 
 export default function RDKitTestPage() {
+  const [debug, setDebug] = useState(true);
+
   return (
     <div className="min-h-screen bg-stone-50 p-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-2 text-2xl font-semibold text-[#1A1A1A]">
-          RDKit-JS Test Page
-        </h1>
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
+          <h1 className="text-2xl font-semibold text-[#1A1A1A]">
+            RDKit-JS Test Page
+          </h1>
+          <button
+            type="button"
+            onClick={() => setDebug((d) => !d)}
+            className="border border-[#1A1A1A]/30 bg-white px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-white"
+          >
+            {debug ? "hide atom indices" : "show atom indices"}
+          </button>
+        </div>
         <p className="mb-8 text-sm text-[#1A1A1A]/60">
-          Phase 1 sanity check + Phase 2 atom-map extraction. The first render
-          loads ~2.5MB of WASM from the CDN; subsequent structures should
-          appear instantly. Atom positions are reported in viewBox coordinates.
+          Phase 1 sanity check + Phase 2A atom-map extraction + Phase 2B debug
+          overlay. The first render loads ~2.5MB of WASM from the CDN;
+          subsequent structures should appear instantly. Atom positions are
+          reported in viewBox coordinates.
         </p>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {SAMPLES.map((s) => (
-            <SampleCard key={s.label} label={s.label} smiles={s.smiles} />
+            <SampleCard
+              key={s.label}
+              label={s.label}
+              smiles={s.smiles}
+              debug={debug}
+            />
           ))}
         </div>
       </div>
@@ -35,7 +52,15 @@ export default function RDKitTestPage() {
   );
 }
 
-function SampleCard({ label, smiles }: { label: string; smiles: string }) {
+function SampleCard({
+  label,
+  smiles,
+  debug,
+}: {
+  label: string;
+  smiles: string;
+  debug: boolean;
+}) {
   const [atomMap, setAtomMap] = useState<AtomMap | null>(null);
 
   return (
@@ -50,6 +75,7 @@ function SampleCard({ label, smiles }: { label: string; smiles: string }) {
           width={240}
           height={240}
           onAtomMap={setAtomMap}
+          debug={debug}
         />
       </div>
       <AtomList atomMap={atomMap} />

@@ -12,6 +12,8 @@ export type AtomData = {
 
 export type AtomMap = {
   atoms: AtomData[];
+  viewBoxX: number;
+  viewBoxY: number;
   svgWidth: number;
   svgHeight: number;
   smiles: string;
@@ -23,6 +25,7 @@ type Props = {
   height?: number;
   fallbackUrl?: string;
   onAtomMap?: (atomMap: AtomMap) => void;
+  debug?: boolean;
 };
 
 type Status =
@@ -39,8 +42,10 @@ export default function RDKitStructure({
   height = 200,
   fallbackUrl,
   onAtomMap,
+  debug = false,
 }: Props) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [atomMap, setAtomMap] = useState<AtomMap | null>(null);
   const svgHostRef = useRef<HTMLDivElement | null>(null);
 
   // Hold the latest onAtomMap in a ref so the cleanup effect doesn't have to
@@ -58,6 +63,7 @@ export default function RDKitStructure({
     // before get_svg finished. mol.delete() frees WASM memory that JS GC won't.
     let activeMol: RDKitMol | null = null;
     setStatus({ kind: "loading" });
+    setAtomMap(null);
 
     (async () => {
       try {
@@ -143,8 +149,9 @@ export default function RDKitStructure({
   //   4. inline background style on the <svg> root
   //   5. expand the viewBox by ~8% on each side so edge atom labels (HO, OH)
   //      have breathing room and don't clip
-  // Then, if a caller asked for an atom map, walk the rendered atoms and
-  // extract their (index, x, y, element) tuples in viewBox coordinates.
+  // Then walk the rendered atoms and extract their (index, x, y, element)
+  // tuples in the (post-expansion) viewBox coordinate space, store them in
+  // state for the debug overlay, and notify any onAtomMap listener.
   useEffect(() => {
     if (status.kind !== "ok") return;
     const host = svgHostRef.current;
@@ -212,12 +219,9 @@ export default function RDKitStructure({
       }
     }
 
-    // Atom-map extraction. Skip the work entirely if no caller is listening.
-    const callback = onAtomMapRef.current;
-    if (callback) {
-      const atomMap = extractAtomMap(svgEl, smiles);
-      if (atomMap) callback(atomMap);
-    }
+    const extracted = extractAtomMap(svgEl, smiles);
+    setAtomMap(extracted);
+    if (extracted) onAtomMapRef.current?.(extracted);
   }, [status, smiles]);
 
   const wrapperStyle: React.CSSProperties = {
@@ -265,6 +269,10 @@ export default function RDKitStructure({
           Couldn&apos;t render
         </span>
       )}
+
+      {debug && status.kind === "ok" && atomMap && (
+        <DebugOverlay atomMap={atomMap} />
+      )}
     </div>
   );
 }
@@ -279,6 +287,46 @@ function ProgressBar({ loading }: { loading: boolean }) {
       style={{ opacity: loading ? 1 : 0 }}
     >
       <div className="h-full w-full animate-pulse bg-[#A8483B]" />
+    </div>
+  );
+}
+
+function DebugOverlay({ atomMap }: { atomMap: AtomMap }) {
+  // The overlay must occupy the same content area as the structure SVG (i.e.
+  // the wrapper minus its padding), and use the same viewBox + aspect-ratio
+  // policy so atom coordinates align pixel-perfect with the rendered atoms.
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-20"
+      style={{ padding: WRAPPER_PADDING, boxSizing: "border-box" }}
+    >
+      <svg
+        className="h-full w-full"
+        viewBox={`${atomMap.viewBoxX} ${atomMap.viewBoxY} ${atomMap.svgWidth} ${atomMap.svgHeight}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {atomMap.atoms.map((a) => (
+          <g key={a.index}>
+            <circle
+              cx={a.x}
+              cy={a.y}
+              r={4}
+              fill="#A8483B"
+              opacity={0.6}
+            />
+            <text
+              x={a.x + 8}
+              y={a.y - 2}
+              fontSize={9}
+              fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              fill="#A8483B"
+            >
+              {a.index}
+            </text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -322,9 +370,6 @@ function extractAtomMap(svgEl: SVGSVGElement, smiles: string): AtomMap | null {
         const bbox = el.getBBox();
         x = bbox.x + bbox.width / 2;
         y = bbox.y + bbox.height / 2;
-        // Strip any subscript/superscript children — for "OH" we want "OH",
-        // for "NH2" we want "NH2", but if RDKit nested the digit in a tspan
-        // textContent still concatenates correctly.
         const text = (el.textContent || "").trim();
         element = text || "C";
         priority = 3;
@@ -363,17 +408,21 @@ function extractAtomMap(svgEl: SVGSVGElement, smiles: string): AtomMap | null {
     .sort((a, b) => a.index - b.index);
 
   // Use the SVG's CURRENT viewBox (after our 8% expansion) so atom coords and
-  // svgWidth/svgHeight share a consistent coordinate system.
+  // the overlay's viewBox share a consistent coordinate system.
   const finalVB = svgEl.getAttribute("viewBox");
+  let viewBoxX = 0;
+  let viewBoxY = 0;
   let svgWidth = 0;
   let svgHeight = 0;
   if (finalVB) {
     const parts = finalVB.split(/\s+/).map(Number);
     if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+      viewBoxX = parts[0];
+      viewBoxY = parts[1];
       svgWidth = parts[2];
       svgHeight = parts[3];
     }
   }
 
-  return { atoms, svgWidth, svgHeight, smiles };
+  return { atoms, viewBoxX, viewBoxY, svgWidth, svgHeight, smiles };
 }
