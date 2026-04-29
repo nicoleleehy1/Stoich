@@ -22,7 +22,7 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "Mol Lens",
+  title: "Stoich",
   description: "Paste any chemistry paragraph. See the molecules.",
 };
 
